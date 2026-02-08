@@ -6,6 +6,7 @@ import twilioWebhookRouter from './routes/webhooks/twilio.js';
 import clientsRouter from './routes/clients.js';
 import campaignsRouter from './routes/campaigns.js';
 import cronRouter from './routes/cron.js';
+import dashboardRouter from './routes/dashboard.js';
 
 dotenv.config();
 
@@ -37,6 +38,7 @@ app.use('/api/webhooks/twilio', twilioWebhookRouter);
 app.use('/api/clients', clientsRouter);
 app.use('/api/campaigns', campaignsRouter);
 app.use('/api/cron', cronRouter);
+app.use('/api/dashboard', dashboardRouter);
 
 // Error handling
 app.use((err, req, res, next) => {
