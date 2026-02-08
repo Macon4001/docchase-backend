@@ -11,10 +11,9 @@ export const auth = async (req, res, next) => {
 
     const token = authHeader.substring(7);
 
-    // For now, we'll use a simple token lookup in the database
-    // In production, you'd want to use JWT tokens
+    // Look up accountant by API token
     const result = await db.query(
-      `SELECT id, email, name FROM accountants WHERE api_token = $1`,
+      `SELECT id, email, practice_name FROM accountants WHERE api_token = $1`,
       [token]
     );
 
@@ -22,10 +21,13 @@ export const auth = async (req, res, next) => {
       return res.status(401).json({ error: 'Invalid token' });
     }
 
-    req.user = result.rows[0];
+    req.accountant = result.rows[0];
     next();
   } catch (error) {
     console.error('Auth middleware error:', error);
     res.status(401).json({ error: 'Authentication failed' });
   }
 };
+
+// Export as 'authenticate' as well for compatibility
+export const authenticate = auth;

@@ -14,11 +14,31 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Middleware
-// Normalize FRONTEND_URL by removing trailing slash to avoid CORS issues
-const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
+// CORS configuration - allow frontend origin
+const allowedOrigins = [
+  'http://localhost:3000',
+  'https://docchase-frontend.vercel.app',
+  process.env.FRONTEND_URL
+].filter(Boolean).map(url => url.replace(/\/$/, '')); // Remove trailing slashes
+
+console.log('🔒 CORS allowed origins:', allowedOrigins);
+
 app.use(cors({
-  origin: frontendUrl,
-  credentials: true
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, Postman, etc.)
+    if (!origin) return callback(null, true);
+
+    // Check if origin is in allowed list
+    if (allowedOrigins.some(allowed => origin === allowed || origin === allowed + '/')) {
+      callback(null, true);
+    } else {
+      console.log('❌ CORS blocked origin:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 // For Twilio webhooks - they send application/x-www-form-urlencoded
