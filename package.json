@@ -1,0 +1,27 @@
+{
+  "name": "docchase-backend",
+  "version": "1.0.0",
+  "description": "DocChase Backend API - Handles Twilio webhooks, client management, and campaign operations",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "nodemon index.js",
+    "start": "node index.js"
+  },
+  "keywords": ["docchase", "api", "twilio", "whatsapp"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "pg": "^8.11.3",
+    "twilio": "^4.19.0",
+    "@anthropic-ai/sdk": "^0.9.1",
+    "googleapis": "^128.0.0",
+    "axios": "^1.6.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}
