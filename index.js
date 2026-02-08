@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import authRouter from './routes/auth.js';
 import twilioWebhookRouter from './routes/webhooks/twilio.js';
 import clientsRouter from './routes/clients.js';
 import campaignsRouter from './routes/campaigns.js';
@@ -29,6 +30,7 @@ app.get('/health', (req, res) => {
 });
 
 // Routes
+app.use('/api/auth', authRouter);
 app.use('/api/webhooks/twilio', twilioWebhookRouter);
 app.use('/api/clients', clientsRouter);
 app.use('/api/campaigns', campaignsRouter);
