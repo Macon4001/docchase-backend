@@ -1,5 +1,14 @@
 import { Request } from 'express';
 
+// Google OAuth Token Structure
+export interface GoogleDriveToken {
+  access_token: string;
+  refresh_token?: string;
+  scope?: string;
+  token_type?: string;
+  expiry_date?: number;
+}
+
 // Database Models
 export interface Accountant {
   id: string;
@@ -7,8 +16,9 @@ export interface Accountant {
   password_hash: string;
   practice_name: string;
   api_token: string | null;
-  google_drive_token: any;
+  google_drive_token: GoogleDriveToken | null;
   google_drive_folder_id: string | null;
+  google_drive_connected_at: Date | null;
   twilio_phone_number: string | null;
   amy_name: string;
   amy_tone: string;
