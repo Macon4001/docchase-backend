@@ -1,4 +1,10 @@
 import { Pool, QueryResult, QueryResultRow } from 'pg';
+import dotenv from 'dotenv';
+
+// Ensure .env is loaded before creating the pool
+dotenv.config();
+
+console.log('🔍 DB Module - DATABASE_URL:', process.env.DATABASE_URL ? 'Loaded ✓' : 'Missing ✗');
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,

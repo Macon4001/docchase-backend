@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import authRouter from './routes/auth.js';
+import googleLoginRouter from './routes/auth/google-login.js';
 import dashboardRouter from './routes/dashboard.js';
 import clientsRouter from './routes/clients.js';
 import campaignsRouter from './routes/campaigns.js';
@@ -11,6 +12,9 @@ import googleAuthRouter from './routes/settings/google-auth.js';
 import googleCallbackRouter from './routes/settings/google-callback.js';
 
 dotenv.config();
+
+// Debug: Check if DATABASE_URL is loaded
+console.log('🔍 DATABASE_URL loaded:', process.env.DATABASE_URL ? 'Yes (length: ' + process.env.DATABASE_URL.length + ')' : 'No');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -53,6 +57,7 @@ app.get('/health', (req, res) => {
 
 // Routes
 app.use('/api/auth', authRouter);
+app.use('/api/auth/google', googleLoginRouter);
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api/clients', clientsRouter);
 app.use('/api/campaigns', campaignsRouter);
