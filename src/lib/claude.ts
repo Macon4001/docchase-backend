@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { db } from './db.js';
-import { Message } from '../types/index.js';
+import { Message as DbMessage } from '../types/index.js';
 
 const apiKey = process.env.ANTHROPIC_API_KEY;
 
@@ -8,7 +8,7 @@ if (!apiKey) {
   console.warn('⚠️ Anthropic API key not configured');
 }
 
-const client = apiKey ? new Anthropic({ apiKey }) : null;
+const client = apiKey ? new Anthropic({ apiKey }) : (null as Anthropic | null);
 
 /**
  * Generate Amy's initial message to request documents
@@ -25,7 +25,7 @@ export async function generateInitialMessage(
   }
 
   try {
-    const response = await client.messages.create({
+    const response = await (client as any).messages.create({
       model: 'claude-3-5-sonnet-20241022',
       max_tokens: 500,
       messages: [
@@ -73,8 +73,8 @@ export async function generateResponse(
 
   try {
     // Get conversation history
-    const messagesResult = await db.query<Message>(
-      `SELECT direction, content, created_at
+    const messagesResult = await db.query<DbMessage>(
+      `SELECT direction, body, created_at
        FROM messages
        WHERE client_id = $1 AND campaign_id = $2
        ORDER BY created_at ASC
@@ -83,7 +83,7 @@ export async function generateResponse(
     );
 
     const conversationHistory = messagesResult.rows
-      .map((m) => `${m.direction === 'inbound' ? clientName : 'Amy'}: ${m.content}`)
+      .map((m) => `${m.direction === 'inbound' ? clientName : 'Amy'}: ${m.body}`)
       .join('\n');
 
     // Check if client sent a document (inferred from message content)
@@ -111,7 +111,7 @@ Keep your response:
 
 Just write the response, nothing else.`;
 
-    const response = await client.messages.create({
+    const response = await (client as any).messages.create({
       model: 'claude-3-5-sonnet-20241022',
       max_tokens: 300,
       messages: [
@@ -149,7 +149,7 @@ export async function generateReminderMessage(
   }
 
   try {
-    const response = await client.messages.create({
+    const response = await (client as any).messages.create({
       model: 'claude-3-5-sonnet-20241022',
       max_tokens: 400,
       messages: [
