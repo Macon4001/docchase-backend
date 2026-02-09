@@ -49,6 +49,11 @@ export interface Campaign {
   reminder_day_3: boolean;
   reminder_day_6: boolean;
   flag_after_day_9: boolean;
+  reminder_1_days?: number;
+  reminder_2_days?: number;
+  reminder_3_days?: number;
+  reminder_send_time?: string;
+  initial_message?: string;
   started_at: Date;
   completed_at: Date | null;
   created_at: Date;

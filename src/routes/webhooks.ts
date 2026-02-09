@@ -57,7 +57,7 @@ router.post('/twilio', async (req: Request, res: Response): Promise<void> => {
     // Store incoming message in database
     const messageResult = await db.query<Message>(
       `INSERT INTO messages
-       (accountant_id, client_id, campaign_id, direction, content, twilio_sid, status)
+       (accountant_id, client_id, campaign_id, direction, sender, body, twilio_sid)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *`,
       [
@@ -65,9 +65,9 @@ router.post('/twilio', async (req: Request, res: Response): Promise<void> => {
         client.id,
         campaign.id,
         'inbound',
+        clientPhone,
         webhook.Body,
-        webhook.MessageSid,
-        'received'
+        webhook.MessageSid
       ]
     );
 

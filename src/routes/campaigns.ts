@@ -27,7 +27,7 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
   }
 });
 
-// Get single campaign by ID
+// Get single campaign by ID with statistics
 router.get('/:id', authenticate, async (req: Request, res: Response): Promise<void> => {
   try {
     const authenticatedReq = req as AuthenticatedRequest;
@@ -45,7 +45,39 @@ router.get('/:id', authenticate, async (req: Request, res: Response): Promise<vo
       return;
     }
 
-    res.json({ campaign: result.rows[0] });
+    // Get campaign statistics
+    const statsResult = await db.query<{
+      total_clients: string;
+      pending: string;
+      received: string;
+      stuck: string;
+    }>(
+      `SELECT
+        COUNT(*) as total_clients,
+        COUNT(*) FILTER (WHERE status = 'pending') as pending,
+        COUNT(*) FILTER (WHERE status = 'received') as received,
+        COUNT(*) FILTER (WHERE status = 'stuck') as stuck
+       FROM campaign_clients
+       WHERE campaign_id = $1`,
+      [campaignId]
+    );
+
+    const stats = statsResult.rows[0] || {
+      total_clients: '0',
+      pending: '0',
+      received: '0',
+      stuck: '0'
+    };
+
+    res.json({
+      campaign: result.rows[0],
+      stats: {
+        total_clients: parseInt(stats.total_clients),
+        pending: parseInt(stats.pending),
+        received: parseInt(stats.received),
+        stuck: parseInt(stats.stuck)
+      }
+    });
   } catch (error) {
     console.error('Get campaign error:', error);
     res.status(500).json({ error: 'Failed to fetch campaign' });
@@ -64,7 +96,12 @@ router.post('/', authenticate, async (req: Request, res: Response): Promise<void
       client_ids,
       reminder_day_3,
       reminder_day_6,
-      flag_after_day_9
+      flag_after_day_9,
+      reminder_1_days,
+      reminder_2_days,
+      reminder_3_days,
+      reminder_send_time,
+      initial_message
     } = req.body;
 
     if (!name || !period) {
@@ -72,13 +109,15 @@ router.post('/', authenticate, async (req: Request, res: Response): Promise<void
       return;
     }
 
-    // Create campaign
+    // Create campaign with custom schedule settings
     const campaignResult = await db.query<Campaign>(
       `INSERT INTO campaigns (
         accountant_id, name, document_type, period,
-        reminder_day_3, reminder_day_6, flag_after_day_9
+        reminder_day_3, reminder_day_6, flag_after_day_9,
+        reminder_1_days, reminder_2_days, reminder_3_days, reminder_send_time,
+        initial_message
       )
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
        RETURNING *`,
       [
         accountantId,
@@ -87,7 +126,12 @@ router.post('/', authenticate, async (req: Request, res: Response): Promise<void
         period,
         reminder_day_3 !== false,
         reminder_day_6 !== false,
-        flag_after_day_9 !== false
+        flag_after_day_9 !== false,
+        reminder_1_days || 3,
+        reminder_2_days || 6,
+        reminder_3_days || 9,
+        reminder_send_time || '10:00',
+        initial_message || null
       ]
     );
 
@@ -166,16 +210,36 @@ router.post('/:id/start', authenticate, async (req: Request, res: Response): Pro
       errors: [] as Array<{ clientName: string; error: string }>,
     };
 
+    console.log(`\n🚀 Starting campaign "${campaign.name}" (ID: ${campaignId})`);
+    console.log(`📊 Sending messages to ${clientsResult.rows.length} clients...\n`);
+
     // Send messages to all clients
     for (const client of clientsResult.rows) {
       try {
-        // Generate personalized message using Claude
-        const messageBody = await generateInitialMessage(
-          client.name,
-          campaign.document_type,
-          campaign.period,
-          practiceName
-        );
+        console.log(`📤 Preparing message for ${client.name}...`);
+
+        // Use custom initial message if provided, otherwise generate with Claude AI
+        let messageBody: string;
+        if (campaign.initial_message) {
+          // Replace variables in the custom template
+          messageBody = campaign.initial_message
+            .replace(/{client_name}/g, client.name)
+            .replace(/{practice_name}/g, practiceName)
+            .replace(/{document_type}/g, campaign.document_type.replace('_', ' '))
+            .replace(/{period}/g, campaign.period);
+          console.log(`   Using custom template`);
+        } else {
+          // Fallback to AI-generated message
+          messageBody = await generateInitialMessage(
+            client.name,
+            campaign.document_type,
+            campaign.period,
+            practiceName
+          );
+          console.log(`   Generated with Claude AI`);
+        }
+
+        console.log(`📱 Sending WhatsApp to ${client.phone}...`);
 
         // Send WhatsApp message
         await sendWhatsApp(
@@ -187,22 +251,25 @@ router.post('/:id/start', authenticate, async (req: Request, res: Response): Pro
         );
 
         // Update campaign_clients to mark first message sent
+        const timestamp = new Date();
         await db.query(
           `UPDATE campaign_clients
-           SET first_message_sent_at = NOW(), status = 'pending'
-           WHERE id = $1`,
-          [client.campaign_client_id]
+           SET first_message_sent_at = $1, status = 'pending'
+           WHERE id = $2`,
+          [timestamp, client.campaign_client_id]
         );
 
         results.success++;
-        console.log(`✅ Sent message to ${client.name} (${client.phone})`);
+        console.log(`✅ [${timestamp.toISOString()}] First message sent to ${client.name} (${client.phone})`);
+        console.log(`   Status: pending | Reminder schedule: ${campaign.reminder_1_days || 3}, ${campaign.reminder_2_days || 6}, ${campaign.reminder_3_days || 9} days\n`);
       } catch (error) {
         results.failed++;
         results.errors.push({
           clientName: client.name,
           error: error instanceof Error ? error.message : 'Unknown error',
         });
-        console.error(`❌ Failed to send to ${client.name}:`, error);
+        console.error(`❌ [${new Date().toISOString()}] Failed to send to ${client.name}:`, error);
+        console.error(`   Phone: ${client.phone}\n`);
       }
     }
 
@@ -213,6 +280,16 @@ router.post('/:id/start', authenticate, async (req: Request, res: Response): Pro
        WHERE id = $1`,
       [campaignId]
     );
+
+    console.log(`\n📈 Campaign Start Summary:`);
+    console.log(`   Campaign: ${campaign.name}`);
+    console.log(`   Total Clients: ${clientsResult.rows.length}`);
+    console.log(`   ✅ Successfully Sent: ${results.success}`);
+    console.log(`   ❌ Failed: ${results.failed}`);
+    console.log(`   Campaign Status: active`);
+    console.log(`   Next Check: Reminders will be sent based on custom schedule`);
+    console.log(`   Reminder Days: ${campaign.reminder_1_days || 3}, ${campaign.reminder_2_days || 6}, ${campaign.reminder_3_days || 9}`);
+    console.log(`   Send Time: ${campaign.reminder_send_time || '10:00'}\n`);
 
     res.json({
       success: true,
@@ -226,6 +303,99 @@ router.post('/:id/start', authenticate, async (req: Request, res: Response): Pro
   } catch (error) {
     console.error('Start campaign error:', error);
     res.status(500).json({ error: 'Failed to start campaign' });
+  }
+});
+
+// Update campaign
+router.patch('/:id', authenticate, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const authenticatedReq = req as AuthenticatedRequest;
+    const accountantId = authenticatedReq.accountant.id;
+    const campaignId = req.params.id;
+    const {
+      name,
+      period,
+      reminder_1_days,
+      reminder_2_days,
+      reminder_3_days,
+      reminder_send_time,
+      initial_message,
+      reminder_day_3,
+      reminder_day_6,
+      flag_after_day_9
+    } = req.body;
+
+    // Build dynamic update query based on provided fields
+    const updates: string[] = [];
+    const values: any[] = [];
+    let paramIndex = 1;
+
+    if (name !== undefined) {
+      updates.push(`name = $${paramIndex++}`);
+      values.push(name);
+    }
+    if (period !== undefined) {
+      updates.push(`period = $${paramIndex++}`);
+      values.push(period);
+    }
+    if (reminder_1_days !== undefined) {
+      updates.push(`reminder_1_days = $${paramIndex++}`);
+      values.push(reminder_1_days);
+    }
+    if (reminder_2_days !== undefined) {
+      updates.push(`reminder_2_days = $${paramIndex++}`);
+      values.push(reminder_2_days);
+    }
+    if (reminder_3_days !== undefined) {
+      updates.push(`reminder_3_days = $${paramIndex++}`);
+      values.push(reminder_3_days);
+    }
+    if (reminder_send_time !== undefined) {
+      updates.push(`reminder_send_time = $${paramIndex++}`);
+      values.push(reminder_send_time);
+    }
+    if (initial_message !== undefined) {
+      updates.push(`initial_message = $${paramIndex++}`);
+      values.push(initial_message);
+    }
+    if (reminder_day_3 !== undefined) {
+      updates.push(`reminder_day_3 = $${paramIndex++}`);
+      values.push(reminder_day_3);
+    }
+    if (reminder_day_6 !== undefined) {
+      updates.push(`reminder_day_6 = $${paramIndex++}`);
+      values.push(reminder_day_6);
+    }
+    if (flag_after_day_9 !== undefined) {
+      updates.push(`flag_after_day_9 = $${paramIndex++}`);
+      values.push(flag_after_day_9);
+    }
+
+    if (updates.length === 0) {
+      res.status(400).json({ error: 'No fields to update' });
+      return;
+    }
+
+    // Add campaignId and accountantId to values
+    values.push(campaignId, accountantId);
+
+    const result = await db.query<Campaign>(
+      `UPDATE campaigns
+       SET ${updates.join(', ')}
+       WHERE id = $${paramIndex++} AND accountant_id = $${paramIndex++}
+       RETURNING *`,
+      values
+    );
+
+    if (result.rows.length === 0) {
+      res.status(404).json({ error: 'Campaign not found' });
+      return;
+    }
+
+    res.json({ success: true, campaign: result.rows[0] });
+  } catch (error) {
+    console.error('Update campaign error:', error);
+    res.status(500).json({ error: 'Failed to update campaign' });
   }
 });
 

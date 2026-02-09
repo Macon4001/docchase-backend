@@ -125,8 +125,9 @@ router.get('/callback', async (req: Request, res: Response) => {
 
     // Redirect to frontend with token
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-    const redirectUrl = `${frontendUrl}/auth/google-callback?token=${apiToken}&id=${accountantId}&email=${encodeURIComponent(googleEmail)}&practice_name=${encodeURIComponent(practiceName)}`;
+    const redirectUrl = `${frontendUrl}/auth/google-callback?token=${encodeURIComponent(apiToken)}&id=${encodeURIComponent(accountantId)}&email=${encodeURIComponent(googleEmail)}&practice_name=${encodeURIComponent(practiceName)}`;
 
+    console.log('[Google Auth] Redirecting with token length:', apiToken.length);
     res.redirect(redirectUrl);
   } catch (error) {
     console.error('Google OAuth callback error:', error);

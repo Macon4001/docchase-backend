@@ -10,6 +10,8 @@ import webhooksRouter from './routes/webhooks.js';
 import settingsRouter from './routes/settings/index.js';
 import googleAuthRouter from './routes/settings/google-auth.js';
 import googleCallbackRouter from './routes/settings/google-callback.js';
+import testRemindersRouter from './routes/test-reminders.js';
+import { startScheduledJobs } from './services/reminder-service.js';
 
 dotenv.config();
 
@@ -42,7 +44,7 @@ app.use(cors({
     }
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
@@ -66,6 +68,12 @@ app.use('/api/settings', settingsRouter);
 app.use('/api/settings/google-auth', googleAuthRouter);
 app.use('/api/settings/google-callback', googleCallbackRouter);
 
+// Test routes (only in development)
+if (process.env.NODE_ENV === 'development') {
+  app.use('/api/test-reminders', testRemindersRouter);
+  console.log('🧪 Test reminder endpoints enabled at /api/test-reminders/*');
+}
+
 // Error handling
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error('Error:', err);
@@ -76,4 +84,8 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
 app.listen(PORT, () => {
   console.log(`🚀 DocChase Backend API running on port ${PORT}`);
   console.log(`📱 Environment: ${process.env.NODE_ENV || 'development'}`);
+
+  // Start scheduled reminder jobs
+  startScheduledJobs();
+  console.log('⏰ Reminder scheduler initialized\n');
 });

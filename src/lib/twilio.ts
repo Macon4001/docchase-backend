@@ -5,7 +5,7 @@ import crypto from 'crypto';
 
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
-const twilioPhone = process.env.TWILIO_PHONE_NUMBER;
+const twilioPhone = process.env.TWILIO_WHATSAPP_NUMBER || process.env.TWILIO_PHONE_NUMBER;
 
 if (!accountSid || !authToken || !twilioPhone) {
   console.warn('⚠️ Twilio credentials not configured');
@@ -42,10 +42,10 @@ export async function sendWhatsApp(
     // Store in database
     const result = await db.query<Message>(
       `INSERT INTO messages
-       (accountant_id, client_id, campaign_id, direction, content, twilio_sid, status)
+       (accountant_id, client_id, campaign_id, direction, sender, body, twilio_sid)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *`,
-      [accountantId, clientId, campaignId || null, 'outbound', body, twilioMessage.sid, 'sent']
+      [accountantId, clientId, campaignId || null, 'outbound', 'system', body, twilioMessage.sid]
     );
 
     console.log(`✅ WhatsApp sent to ${to} - SID: ${twilioMessage.sid}`);
@@ -56,10 +56,10 @@ export async function sendWhatsApp(
     // Store failed message in database
     const result = await db.query<Message>(
       `INSERT INTO messages
-       (accountant_id, client_id, campaign_id, direction, content, status)
+       (accountant_id, client_id, campaign_id, direction, sender, body)
        VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING *`,
-      [accountantId, clientId, campaignId || null, 'outbound', body, 'failed']
+      [accountantId, clientId, campaignId || null, 'outbound', 'system', body]
     );
 
     throw error;
