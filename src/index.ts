@@ -82,7 +82,7 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`🚀 DocChase Backend API running on port ${PORT}`);
+  console.log(`🚀 Gettingdocs Backend API running on port ${PORT}`);
   console.log(`📱 Environment: ${process.env.NODE_ENV || 'development'}`);
 
   // Start scheduled reminder jobs
