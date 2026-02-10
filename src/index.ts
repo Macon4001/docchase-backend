@@ -7,6 +7,9 @@ import dashboardRouter from './routes/dashboard.js';
 import clientsRouter from './routes/clients.js';
 import campaignsRouter from './routes/campaigns.js';
 import webhooksRouter from './routes/webhooks.js';
+import stripeWebhookRouter from './routes/webhooks/stripe.js';
+import checkoutRouter from './routes/checkout.js';
+import billingRouter from './routes/billing.js';
 import settingsRouter from './routes/settings/index.js';
 import googleAuthRouter from './routes/settings/google-auth.js';
 import googleCallbackRouter from './routes/settings/google-callback.js';
@@ -48,7 +51,10 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// Body parsers
+// Stripe webhook route MUST come before body parsers (needs raw body)
+app.use('/api/webhooks/stripe', express.raw({ type: 'application/json' }), stripeWebhookRouter);
+
+// Body parsers for all other routes
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -64,6 +70,8 @@ app.use('/api/dashboard', dashboardRouter);
 app.use('/api/clients', clientsRouter);
 app.use('/api/campaigns', campaignsRouter);
 app.use('/api/webhooks', webhooksRouter);
+app.use('/api/checkout', checkoutRouter);
+app.use('/api/billing', billingRouter);
 app.use('/api/settings', settingsRouter);
 app.use('/api/settings/google-auth', googleAuthRouter);
 app.use('/api/settings/google-callback', googleCallbackRouter);

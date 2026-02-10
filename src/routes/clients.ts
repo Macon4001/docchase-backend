@@ -62,6 +62,37 @@ router.post('/', authenticate, async (req: Request, res: Response): Promise<void
       return;
     }
 
+    // Check subscription limits
+    const accountant = await db.query(
+      `SELECT client_limit, subscription_status FROM accountants WHERE id = $1`,
+      [accountantId]
+    );
+
+    if (!accountant.rows[0]) {
+      res.status(404).json({ error: 'Accountant not found' });
+      return;
+    }
+
+    const clientLimit = accountant.rows[0].client_limit || 1;
+
+    // Count current clients
+    const clientCount = await db.query(
+      'SELECT COUNT(*) FROM clients WHERE accountant_id = $1',
+      [accountantId]
+    );
+
+    const currentCount = parseInt(clientCount.rows[0].count);
+
+    if (currentCount >= clientLimit) {
+      res.status(403).json({
+        error: 'Client limit reached',
+        upgrade: true,
+        currentCount,
+        limit: clientLimit
+      });
+      return;
+    }
+
     // Check if client with this phone already exists for this accountant
     const existing = await db.query<Client>(
       'SELECT id FROM clients WHERE accountant_id = $1 AND phone = $2',

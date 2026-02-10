@@ -173,6 +173,35 @@ router.post('/:id/start', authenticate, async (req: Request, res: Response): Pro
     const accountantId = authenticatedReq.accountant.id;
     const campaignId = req.params.id;
 
+    // Check subscription limits (for free plan)
+    const accountant = await db.query(
+      `SELECT subscription_plan, chase_limit, chases_used FROM accountants WHERE id = $1`,
+      [accountantId]
+    );
+
+    if (!accountant.rows[0]) {
+      res.status(404).json({ error: 'Accountant not found' });
+      return;
+    }
+
+    const acc = accountant.rows[0];
+
+    // Enforce chase limit for free plan
+    if (acc.subscription_plan === 'free') {
+      const chaseLimit = acc.chase_limit || 3;
+      const chasesUsed = acc.chases_used || 0;
+
+      if (chasesUsed >= chaseLimit) {
+        res.status(403).json({
+          error: 'Chase limit reached on free plan',
+          upgrade: true,
+          chasesUsed,
+          limit: chaseLimit
+        });
+        return;
+      }
+    }
+
     // Get campaign details
     const campaignResult = await db.query<Campaign>(
       `SELECT * FROM campaigns
@@ -289,6 +318,15 @@ router.post('/:id/start', authenticate, async (req: Request, res: Response): Pro
        WHERE id = $1`,
       [campaignId]
     );
+
+    // Increment chase counter for free plan users
+    if (acc.subscription_plan === 'free') {
+      await db.query(
+        'UPDATE accountants SET chases_used = chases_used + 1 WHERE id = $1',
+        [accountantId]
+      );
+      console.log(`📊 Free plan chase counter incremented: ${acc.chases_used + 1}/${acc.chase_limit || 3}`);
+    }
 
     console.log(`\n📈 Campaign Start Summary:`);
     console.log(`   Campaign: ${campaign.name}`);
