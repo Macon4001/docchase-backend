@@ -100,7 +100,7 @@ router.post('/twilio', async (req: Request, res: Response): Promise<void> => {
       await db.query(
         `UPDATE campaign_clients
          SET status = 'received',
-             document_received_at = NOW()
+             received_at = NOW()
          WHERE id = $1`,
         [campaign.campaign_client_id]
       );
