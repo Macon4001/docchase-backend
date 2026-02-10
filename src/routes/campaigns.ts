@@ -7,16 +7,24 @@ import { generateInitialMessage } from '../lib/claude.js';
 
 const router = express.Router();
 
-// Get all campaigns for the authenticated accountant
+// Get all campaigns for the authenticated accountant with statistics
 router.get('/', authenticate, async (req: Request, res: Response): Promise<void> => {
   try {
     const authenticatedReq = req as AuthenticatedRequest;
     const accountantId = authenticatedReq.accountant.id;
 
     const result = await db.query<Campaign>(
-      `SELECT * FROM campaigns
-       WHERE accountant_id = $1
-       ORDER BY created_at DESC`,
+      `SELECT
+        c.*,
+        COUNT(cc.id) as total_clients,
+        COUNT(cc.id) FILTER (WHERE cc.status = 'pending') as pending,
+        COUNT(cc.id) FILTER (WHERE cc.status = 'received') as received,
+        COUNT(cc.id) FILTER (WHERE cc.status = 'stuck') as stuck
+       FROM campaigns c
+       LEFT JOIN campaign_clients cc ON c.id = cc.campaign_id
+       WHERE c.accountant_id = $1
+       GROUP BY c.id
+       ORDER BY c.created_at DESC`,
       [accountantId]
     );
 
