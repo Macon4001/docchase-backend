@@ -298,18 +298,47 @@ export async function uploadCampaignDocument(
     throw new Error('Google Drive not connected for this accountant. Please connect Google Drive first.');
   }
 
-  const { tokens, folderId } = accountantData;
-
-  if (!folderId) {
-    throw new Error('Google Drive folder not configured. Please reconnect Google Drive.');
-  }
+  let { tokens, folderId } = accountantData;
 
   // Refresh tokens if needed
   const freshTokens = await refreshTokensIfNeeded(tokens);
 
-  // If tokens were refreshed, save them
+  // If tokens were refreshed, save them (temporary, we'll save with folder ID later)
   if (freshTokens !== tokens) {
+    tokens = freshTokens;
+  }
+
+  // ALWAYS ensure Amy Documents folder exists (get or create)
+  if (!folderId) {
+    console.log('📁 No Amy Documents folder found, creating one...');
+    const amyFolder = await getOrCreateAmyFolder(freshTokens);
+    folderId = amyFolder.id;
+    console.log(`✅ Amy Documents folder ready: ${amyFolder.webViewLink}`);
+
+    // Save the folder ID to database
     await storeGoogleTokens(accountantId, freshTokens, folderId);
+  } else {
+    // Verify the folder still exists, if not create a new one
+    try {
+      const oauth2Client = getOAuthClient();
+      oauth2Client.setCredentials(freshTokens);
+      const drive = google.drive({ version: 'v3', auth: oauth2Client });
+
+      await drive.files.get({
+        fileId: folderId,
+        fields: 'id, name, trashed'
+      });
+
+      console.log(`✅ Using existing Amy Documents folder: ${folderId}`);
+    } catch (error) {
+      console.log('⚠️ Stored Amy Documents folder not found or deleted, creating new one...');
+      const amyFolder = await getOrCreateAmyFolder(freshTokens);
+      folderId = amyFolder.id;
+      console.log(`✅ New Amy Documents folder created: ${amyFolder.webViewLink}`);
+
+      // Update the folder ID in database
+      await storeGoogleTokens(accountantId, freshTokens, folderId);
+    }
   }
 
   // Download the file from Twilio URL
