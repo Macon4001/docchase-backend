@@ -26,13 +26,18 @@ router.get('/', (req: Request, res: Response) => {
     GOOGLE_LOGIN_REDIRECT_URI
   );
 
+  // Get redirect parameter from query to pass through OAuth state
+  const redirect = req.query.redirect as string | undefined;
+
   const authUrl = oauth2Client.generateAuthUrl({
     access_type: 'offline',
     scope: [
       'https://www.googleapis.com/auth/userinfo.profile',
       'https://www.googleapis.com/auth/userinfo.email'
     ],
-    prompt: 'select_account'
+    prompt: 'select_account',
+    // Pass redirect in state parameter to preserve it through OAuth flow
+    state: redirect ? JSON.stringify({ redirect }) : undefined
   });
 
   res.json({ authUrl });
@@ -43,7 +48,18 @@ router.get('/', (req: Request, res: Response) => {
  * Handles Google OAuth callback
  */
 router.get('/callback', async (req: Request, res: Response) => {
-  const { code, error } = req.query;
+  const { code, error, state } = req.query;
+
+  // Extract redirect from state parameter
+  let redirect: string | undefined;
+  if (state && typeof state === 'string') {
+    try {
+      const stateData = JSON.parse(state);
+      redirect = stateData.redirect;
+    } catch (e) {
+      // Invalid state, ignore
+    }
+  }
 
   if (error) {
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
@@ -125,7 +141,12 @@ router.get('/callback', async (req: Request, res: Response) => {
 
     // Redirect to frontend with token
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-    const redirectUrl = `${frontendUrl}/auth/google-callback?token=${encodeURIComponent(apiToken)}&id=${encodeURIComponent(accountantId)}&email=${encodeURIComponent(googleEmail)}&practice_name=${encodeURIComponent(practiceName)}`;
+    let redirectUrl = `${frontendUrl}/auth/google-callback?token=${encodeURIComponent(apiToken)}&id=${encodeURIComponent(accountantId)}&email=${encodeURIComponent(googleEmail)}&practice_name=${encodeURIComponent(practiceName)}`;
+
+    // Add redirect parameter if present
+    if (redirect) {
+      redirectUrl += `&redirect=${encodeURIComponent(redirect)}`;
+    }
 
     console.log('[Google Auth] Redirecting with token length:', apiToken.length);
     res.redirect(redirectUrl);
