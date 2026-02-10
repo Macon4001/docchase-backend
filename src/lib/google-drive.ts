@@ -279,21 +279,106 @@ export async function disconnectGoogleDrive(accountantId: string): Promise<void>
 }
 
 /**
- * Legacy wrapper: Upload a file from a URL to Google Drive (for campaign documents)
- * This function downloads the file from the URL and uploads it to Google Drive
- *
- * @deprecated Use the new token-based uploadToGoogleDrive instead
+ * Upload a file from a URL to Google Drive (for campaign documents)
+ * Downloads the file from Twilio and uploads it to the accountant's Google Drive
  */
 export async function uploadCampaignDocument(
-  _accountantId: string,
-  _campaignId: string,
-  _campaignName: string,
-  _clientName: string,
-  _fileUrl: string,
-  _fileType: string,
-  _documentId: string
+  accountantId: string,
+  campaignId: string,
+  campaignName: string,
+  clientName: string,
+  fileUrl: string,
+  fileType: string,
+  documentId: string
 ): Promise<{ driveFileId: string; driveFileUrl: string }> {
-  // This is a placeholder for the old uploadToGoogleDrive function
-  // You'll need to implement the full logic when you have campaign support ready
-  throw new Error('Campaign document upload not yet implemented with OAuth. Please connect Google Drive first.');
+  // Get accountant's Google tokens
+  const accountantData = await getAccountantTokens(accountantId);
+
+  if (!accountantData) {
+    throw new Error('Google Drive not connected for this accountant. Please connect Google Drive first.');
+  }
+
+  const { tokens, folderId } = accountantData;
+
+  if (!folderId) {
+    throw new Error('Google Drive folder not configured. Please reconnect Google Drive.');
+  }
+
+  // Refresh tokens if needed
+  const freshTokens = await refreshTokensIfNeeded(tokens);
+
+  // If tokens were refreshed, save them
+  if (freshTokens !== tokens) {
+    await storeGoogleTokens(accountantId, freshTokens, folderId);
+  }
+
+  // Download the file from Twilio URL
+  const axios = (await import('axios')).default;
+
+  // Twilio requires authentication for media URLs
+  const twilioAccountSid = process.env.TWILIO_ACCOUNT_SID;
+  const twilioAuthToken = process.env.TWILIO_AUTH_TOKEN;
+
+  if (!twilioAccountSid || !twilioAuthToken) {
+    throw new Error('Twilio credentials not configured');
+  }
+
+  console.log(`📥 Downloading file from Twilio: ${fileUrl}`);
+
+  const response = await axios.get(fileUrl, {
+    auth: {
+      username: twilioAccountSid,
+      password: twilioAuthToken
+    },
+    responseType: 'arraybuffer'
+  });
+
+  const fileBuffer = Buffer.from(response.data);
+
+  // Extract filename from document or generate one
+  const documentResult = await db.query<{ id: string }>(
+    `SELECT id FROM documents WHERE id = $1`,
+    [documentId]
+  );
+
+  if (documentResult.rows.length === 0) {
+    throw new Error('Document not found in database');
+  }
+
+  // Generate a safe filename
+  const safeClientName = clientName.replace(/[^a-zA-Z0-9]/g, '_');
+  const safeCampaignName = campaignName.replace(/[^a-zA-Z0-9]/g, '_');
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
+  const extension = fileType.includes('pdf') ? 'pdf' : fileType.includes('image') ? 'jpg' : 'file';
+  const filename = `${safeClientName}_${safeCampaignName}_${timestamp}.${extension}`;
+
+  // Get or create client subfolder
+  const clientFolderData = await createClientFolder(freshTokens, folderId, clientName);
+
+  console.log(`📁 Uploading to Google Drive folder: ${clientFolderData.name}`);
+
+  // Upload file to Google Drive
+  const uploadResult = await uploadToGoogleDrive(
+    freshTokens,
+    clientFolderData.id,
+    filename,
+    fileBuffer,
+    fileType
+  );
+
+  console.log(`✅ File uploaded to Google Drive: ${uploadResult.webViewLink}`);
+
+  // Update document record with Google Drive info
+  await db.query(
+    `UPDATE documents
+     SET drive_file_id = $1,
+         drive_file_url = $2
+     WHERE id = $3`,
+    [uploadResult.id, uploadResult.webViewLink, documentId]
+  );
+
+  return {
+    driveFileId: uploadResult.id,
+    driveFileUrl: uploadResult.webViewLink
+  };
 }
