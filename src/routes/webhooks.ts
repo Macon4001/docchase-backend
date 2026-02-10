@@ -82,15 +82,14 @@ router.post('/twilio', async (req: Request, res: Response): Promise<void> => {
       // Store document in database
       const documentResult = await db.query<Document>(
         `INSERT INTO documents
-         (accountant_id, client_id, campaign_id, original_url, file_type, status)
-         VALUES ($1, $2, $3, $4, $5, $6)
+         (accountant_id, client_id, campaign_id, original_url, conversion_status)
+         VALUES ($1, $2, $3, $4, $5)
          RETURNING *`,
         [
           campaign.accountant_id,
           client.id,
           campaign.id,
           webhook.MediaUrl0,
-          webhook.MediaContentType0 || 'unknown',
           'pending_upload'
         ]
       );

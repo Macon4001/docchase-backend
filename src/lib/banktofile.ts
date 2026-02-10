@@ -26,7 +26,7 @@ export async function convertPdfToCsv(
     // Update document status to converting
     await db.query(
       `UPDATE documents
-       SET status = 'converting'
+       SET conversion_status = 'converting'
        WHERE id = $1`,
       [documentId]
     );
@@ -72,12 +72,10 @@ export async function convertPdfToCsv(
         // Update document with CSV info
         await db.query(
           `UPDATE documents
-           SET csv_url = $1,
-               transaction_count = $2,
-               status = 'converted',
-               converted_at = NOW()
-           WHERE id = $3`,
-          [csv_url, transaction_count, documentId]
+           SET csv_drive_file_url = $1,
+               conversion_status = 'converted'
+           WHERE id = $2`,
+          [csv_url, documentId]
         );
 
         return { csvUrl: csv_url, transactions: transaction_count };
@@ -95,7 +93,7 @@ export async function convertPdfToCsv(
     // Update document status to conversion_failed
     await db.query(
       `UPDATE documents
-       SET status = 'conversion_failed'
+       SET conversion_status = 'conversion_failed'
        WHERE id = $1`,
       [documentId]
     );
