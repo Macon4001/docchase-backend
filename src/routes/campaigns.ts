@@ -109,21 +109,22 @@ router.post('/', authenticate, async (req: Request, res: Response): Promise<void
       return;
     }
 
-    // Create campaign with custom schedule settings
+    // Create campaign with custom schedule settings (status defaults to 'draft')
     const campaignResult = await db.query<Campaign>(
       `INSERT INTO campaigns (
-        accountant_id, name, document_type, period,
+        accountant_id, name, document_type, period, status,
         reminder_day_3, reminder_day_6, flag_after_day_9,
         reminder_1_days, reminder_2_days, reminder_3_days, reminder_send_time,
         initial_message
       )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
        RETURNING *`,
       [
         accountantId,
         name,
         document_type || 'bank_statement',
         period,
+        'draft', // Always create campaigns in draft status
         reminder_day_3 !== false,
         reminder_day_6 !== false,
         flag_after_day_9 !== false,
