@@ -4,11 +4,19 @@ import { Message as DbMessage } from '../types/index.js';
 
 const apiKey = process.env.ANTHROPIC_API_KEY;
 
+console.log('🔍 Anthropic API Key check:', {
+  exists: !!apiKey,
+  length: apiKey?.length,
+  firstChars: apiKey?.substring(0, 10)
+});
+
 if (!apiKey) {
   console.warn('⚠️ Anthropic API key not configured');
 }
 
-const client = apiKey ? new Anthropic({ apiKey }) : (null as Anthropic | null);
+const client = apiKey ? new Anthropic({ apiKey }) : null;
+
+console.log('🤖 Claude client initialized:', !!client);
 
 /**
  * Generate Amy's initial message to request documents
@@ -25,7 +33,7 @@ export async function generateInitialMessage(
   }
 
   try {
-    const response = await (client as any).messages.create({
+    const response = await client!.messages.create({
       model: 'claude-3-5-sonnet-20241022',
       max_tokens: 500,
       messages: [
@@ -111,7 +119,7 @@ Keep your response:
 
 Just write the response, nothing else.`;
 
-    const response = await (client as any).messages.create({
+    const response = await client!.messages.create({
       model: 'claude-3-5-sonnet-20241022',
       max_tokens: 300,
       messages: [
@@ -149,7 +157,7 @@ export async function generateReminderMessage(
   }
 
   try {
-    const response = await (client as any).messages.create({
+    const response = await client!.messages.create({
       model: 'claude-3-5-sonnet-20241022',
       max_tokens: 400,
       messages: [
