@@ -28,6 +28,7 @@ const PORT = process.env.PORT || 3001;
 const allowedOrigins = [
   'http://localhost:3000',
   'https://docchase-frontend.vercel.app',
+  'https://www.gettingdocs.com',
   process.env.FRONTEND_URL
 ].filter(Boolean).map(url => url!.replace(/\/$/, '')); // Remove trailing slashes
 
