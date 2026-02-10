@@ -20,6 +20,7 @@ router.get('/', auth, async (req: Request, res: Response): Promise<void> => {
         practice_name,
         amy_name,
         amy_tone,
+        contact_details,
         google_drive_folder_id,
         google_drive_connected_at,
         notification_email,
@@ -44,6 +45,7 @@ router.get('/', auth, async (req: Request, res: Response): Promise<void> => {
         practiceName: accountant.practice_name,
         amyName: accountant.amy_name || 'Amy',
         amyTone: accountant.amy_tone || 'friendly',
+        contactDetails: accountant.contact_details || '',
         googleDriveConnected: !!accountant.google_drive_connected_at,
         googleDriveConnectedAt: accountant.google_drive_connected_at,
         notificationEmail: accountant.notification_email,
@@ -67,6 +69,7 @@ router.put('/', auth, async (req: Request, res: Response): Promise<void> => {
       practiceName,
       amyName,
       amyTone,
+      contactDetails,
       notificationEmail,
       notificationStuck
     } = req.body;
@@ -77,11 +80,12 @@ router.put('/', auth, async (req: Request, res: Response): Promise<void> => {
         practice_name = COALESCE($1, practice_name),
         amy_name = COALESCE($2, amy_name),
         amy_tone = COALESCE($3, amy_tone),
-        notification_email = COALESCE($4, notification_email),
-        notification_stuck = COALESCE($5, notification_stuck),
+        contact_details = COALESCE($4, contact_details),
+        notification_email = COALESCE($5, notification_email),
+        notification_stuck = COALESCE($6, notification_stuck),
         updated_at = NOW()
-      WHERE id = $6`,
-      [practiceName, amyName, amyTone, notificationEmail, notificationStuck, accountantId]
+      WHERE id = $7`,
+      [practiceName, amyName, amyTone, contactDetails, notificationEmail, notificationStuck, accountantId]
     );
 
     res.json({ success: true, message: 'Settings updated' });

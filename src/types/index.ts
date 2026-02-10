@@ -22,6 +22,7 @@ export interface Accountant {
   twilio_phone_number: string | null;
   amy_name: string;
   amy_tone: string;
+  contact_details: string | null;
   notification_email: boolean;
   notification_stuck: boolean;
   created_at: Date;
