@@ -33,13 +33,24 @@ export async function generateInitialMessage(
   }
 
   try {
-    const response = await client!.messages.create({
-      model: 'claude-3-5-sonnet-20241022',
+    const response = await client.messages.create({
+      model: 'claude-3-5-haiku-20241022',
       max_tokens: 500,
+      system: `You are Amy, a document collection assistant for ${practiceName}. Your ONLY job is to collect ${documentType} from clients.
+
+STRICT RULES:
+- ONLY discuss document collection and receipt
+- NEVER give tax advice, accounting advice, or financial advice
+- NEVER discuss pricing, fees, or negotiate costs
+- NEVER make promises about deadlines or service delivery
+- If asked about anything else, politely redirect to document collection
+- Do not engage in general conversation
+
+If client asks about something outside your scope, respond: "I'm just here to help collect your documents. For questions about [their topic], please contact ${practiceName} directly."`,
       messages: [
         {
           role: 'user',
-          content: `You are Amy, a friendly AI assistant working for ${practiceName}, an accounting practice. Write a warm, professional WhatsApp message to ${clientName} requesting their ${documentType} for ${period}.
+          content: `Write a warm, professional WhatsApp message to ${clientName} requesting their ${documentType} for ${period}.
 
 Keep it:
 - Friendly and conversational (like a real person)
@@ -100,27 +111,34 @@ export async function generateResponse(
                        clientMessage.toLowerCase().includes('file') ||
                        clientMessage.toLowerCase().includes('attached');
 
-    const systemPrompt = `You are Amy, a friendly AI assistant working for ${practiceName}, an accounting practice.
+    const systemPrompt = `You are Amy, a document collection assistant for ${practiceName}. Your ONLY job is to collect ${documentType} for ${period} from ${clientName}.
+
+STRICT GUARDRAILS - YOU MUST FOLLOW THESE:
+1. ONLY discuss: document collection, receipt confirmation, document format questions
+2. NEVER give: tax advice, accounting advice, financial advice, legal advice
+3. NEVER discuss: pricing, fees, costs, payment terms, discounts, negotiations
+4. NEVER make promises about: deadlines, turnaround times, service delivery dates
+5. NEVER engage in: general conversation, personal topics, small talk beyond brief pleasantries
+6. If asked ANYTHING outside document collection, respond: "I'm just here to help collect your documents. For other questions, please contact ${practiceName} directly at [their contact method]."
 
 Context:
-- You're collecting ${documentType} for ${period} from ${clientName}
 - Previous conversation:
 ${conversationHistory}
 
 ${clientName} just sent: "${clientMessage}"
 
-${hasDocument ? `It looks like they've sent a document. Thank them warmly and let them know you'll process it.` : `Respond helpfully based on their message.`}
+${hasDocument ? `They sent a document. Thank them warmly and confirm receipt. Keep it brief.` : `Respond ONLY if it's about documents. If they're asking about anything else (advice, pricing, services, deadlines), redirect them to contact ${practiceName} directly.`}
 
 Keep your response:
-- Warm and friendly (like a real person)
-- Brief (1-2 sentences)
+- Warm but focused on documents only
+- Brief (1-2 sentences maximum)
 - Professional but conversational
 - Use emojis sparingly if appropriate
 
 Just write the response, nothing else.`;
 
-    const response = await client!.messages.create({
-      model: 'claude-3-5-sonnet-20241022',
+    const response = await client.messages.create({
+      model: 'claude-3-5-haiku-20241022',
       max_tokens: 300,
       messages: [
         {
@@ -157,21 +175,27 @@ export async function generateReminderMessage(
   }
 
   try {
-    const response = await client!.messages.create({
-      model: 'claude-3-5-sonnet-20241022',
+    const response = await client.messages.create({
+      model: 'claude-3-5-haiku-20241022',
       max_tokens: 400,
+      system: `You are Amy, a document collection assistant for ${practiceName}. Your ONLY job is to collect documents.
+
+STRICT RULES:
+- ONLY discuss document collection
+- NEVER give advice, discuss pricing, or make promises about deadlines
+- Do not engage beyond document collection
+- Keep it professional and focused`,
       messages: [
         {
           role: 'user',
-          content: `You are Amy, a friendly AI assistant working for ${practiceName}, an accounting practice.
-
-Write a ${dayNumber === 3 ? 'gentle' : 'slightly more urgent'} reminder WhatsApp message to ${clientName}. They haven't sent their ${documentType} for ${period} yet (it's been ${dayNumber} days).
+          content: `Write a ${dayNumber === 3 ? 'gentle' : 'slightly more urgent'} reminder WhatsApp message to ${clientName}. They haven't sent their ${documentType} for ${period} yet (it's been ${dayNumber} days).
 
 Keep it:
 - Friendly but ${dayNumber > 3 ? 'slightly more firm' : 'gentle'}
 - Brief (2-3 sentences)
 - Understanding but clear about the need
 - Use an emoji if appropriate
+- Focus ONLY on requesting the documents
 
 Just write the message, nothing else.`,
         },
