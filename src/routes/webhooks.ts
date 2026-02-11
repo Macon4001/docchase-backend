@@ -3,6 +3,7 @@ import { db } from '../lib/db.js';
 import { parseTwilioWebhook, TwilioWebhookPayload, sendWhatsApp } from '../lib/twilio.js';
 import { generateResponse } from '../lib/claude.js';
 import { processDocument } from '../lib/banktofile.js';
+import { createNotification } from './notifications.js';
 import { Message, Client, Campaign, Document } from '../types/index.js';
 
 const router = express.Router();
@@ -106,6 +107,16 @@ router.post('/twilio', async (req: Request, res: Response): Promise<void> => {
       );
 
       console.log(`✅ Document stored for ${client.name}`);
+
+      // Create notification for document received
+      await createNotification(
+        campaign.accountant_id,
+        'client_response',
+        'Document Received',
+        `${client.name} has sent a document`,
+        client.name,
+        campaign.name
+      );
 
       // Process document asynchronously (upload to Drive + convert to CSV)
       // Don't await - let it run in background so we can respond to Twilio quickly

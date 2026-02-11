@@ -406,6 +406,22 @@ export async function uploadCampaignDocument(
     [uploadResult.id, uploadResult.webViewLink, documentId]
   );
 
+  // Create notification for document uploaded to Drive
+  try {
+    const { createNotification } = await import('../routes/notifications.js');
+    await createNotification(
+      accountantId,
+      'document_uploaded',
+      'Document Saved to Drive',
+      `${clientName}'s document has been saved to Google Drive`,
+      clientName,
+      campaignName
+    );
+  } catch (notifError) {
+    console.error('Failed to create notification:', notifError);
+    // Don't fail upload if notification fails
+  }
+
   return {
     driveFileId: uploadResult.id,
     driveFileUrl: uploadResult.webViewLink
