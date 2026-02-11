@@ -13,6 +13,7 @@ interface CampaignClient {
   status: string;
   accountant_id: string;
   practice_name: string;
+  amy_name: string;
   document_type: string;
   period: string;
   reminder_day_3: boolean;
@@ -77,6 +78,7 @@ export async function sendReminder1(): Promise<{ success: number; failed: number
         cc.status,
         camp.accountant_id,
         acc.practice_name,
+        acc.amy_name,
         camp.document_type,
         camp.period,
         camp.reminder_day_3,
@@ -128,7 +130,8 @@ export async function sendReminder1(): Promise<{ success: number; failed: number
           client.document_type,
           client.period,
           client.practice_name,
-          client.reminder_1_days // Use custom day number
+          client.reminder_1_days, // Use custom day number
+          client.amy_name || 'Amy' // Use custom assistant name
         );
 
         // Send WhatsApp message
@@ -191,6 +194,7 @@ export async function sendReminder2(): Promise<{ success: number; failed: number
         cc.status,
         camp.accountant_id,
         acc.practice_name,
+        acc.amy_name,
         camp.document_type,
         camp.period,
         camp.reminder_day_3,
@@ -239,7 +243,8 @@ export async function sendReminder2(): Promise<{ success: number; failed: number
           client.document_type,
           client.period,
           client.practice_name,
-          client.reminder_2_days // Use custom day number
+          client.reminder_2_days, // Use custom day number
+          client.amy_name || 'Amy' // Use custom assistant name
         );
 
         await sendWhatsApp(

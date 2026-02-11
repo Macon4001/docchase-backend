@@ -221,12 +221,13 @@ router.post('/:id/start', authenticate, async (req: Request, res: Response): Pro
       return;
     }
 
-    // Get accountant details for practice name
-    const accountantResult = await db.query<{ practice_name: string }>(
-      `SELECT practice_name FROM accountants WHERE id = $1`,
+    // Get accountant details for practice name and assistant name
+    const accountantResult = await db.query<{ practice_name: string; amy_name: string }>(
+      `SELECT practice_name, amy_name FROM accountants WHERE id = $1`,
       [accountantId]
     );
     const practiceName = accountantResult.rows[0]?.practice_name || 'your accountant';
+    const assistantName = accountantResult.rows[0]?.amy_name || 'Amy';
 
     // Get all clients in the campaign
     const clientsResult = await db.query<Client & { campaign_client_id: string }>(
@@ -272,7 +273,8 @@ router.post('/:id/start', authenticate, async (req: Request, res: Response): Pro
             client.name,
             campaign.document_type,
             campaign.period,
-            practiceName
+            practiceName,
+            assistantName
           );
           console.log(`   Generated with Claude AI`);
         }

@@ -137,34 +137,36 @@ router.post('/twilio', async (req: Request, res: Response): Promise<void> => {
     const shouldRespond = await shouldRespondToMessage(webhook.Body, hasMedia);
 
     if (shouldRespond) {
-      // Get accountant practice name for Amy's response
-      const accountantResult = await db.query<{ practice_name: string }>(
-        `SELECT practice_name FROM accountants WHERE id = $1`,
+      // Get accountant details for response
+      const accountantResult = await db.query<{ practice_name: string; amy_name: string }>(
+        `SELECT practice_name, amy_name FROM accountants WHERE id = $1`,
         [campaign.accountant_id]
       );
       const practiceName = accountantResult.rows[0]?.practice_name || 'your accountant';
+      const assistantName = accountantResult.rows[0]?.amy_name || 'Amy';
 
-      // Generate Amy's response using Claude
-      const amyResponse = await generateResponse(
+      // Generate assistant's response using Claude
+      const assistantResponse = await generateResponse(
         client.id,
         client.name,
         webhook.Body,
         campaign.id,
         practiceName,
         campaign.document_type,
-        campaign.period
+        campaign.period,
+        assistantName
       );
 
-      // Send Amy's response
+      // Send assistant's response
       await sendWhatsApp(
         clientPhone,
-        amyResponse,
+        assistantResponse,
         campaign.accountant_id,
         client.id,
         campaign.id
       );
 
-      console.log(`✅ Amy responded to ${client.name}: "${amyResponse}"`);
+      console.log(`✅ ${assistantName} responded to ${client.name}: "${assistantResponse}"`);
     } else {
       console.log(`⏭️ Skipped response to ${client.name} - message doesn't require reply`);
     }

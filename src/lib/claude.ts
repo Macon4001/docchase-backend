@@ -25,18 +25,19 @@ export async function generateInitialMessage(
   clientName: string,
   documentType: string,
   period: string,
-  practiceName: string
+  practiceName: string,
+  assistantName: string = 'Amy'
 ): Promise<string> {
   if (!client) {
     // Fallback message if Claude not configured
-    return `Hi ${clientName}! 👋\n\nThis is Amy from ${practiceName}. We need your ${documentType} for ${period} to complete your accounting.\n\nCould you please send them as a PDF or photo? Thanks!`;
+    return `Hi ${clientName}! 👋\n\nThis is ${assistantName} from ${practiceName}. We need your ${documentType} for ${period} to complete your accounting.\n\nCould you please send them as a PDF or photo? Thanks!`;
   }
 
   try {
     const response = await client.messages.create({
       model: 'claude-3-5-haiku-20241022',
       max_tokens: 500,
-      system: `You are Amy, a document collection assistant for ${practiceName}. Your ONLY job is to collect ${documentType} from clients.
+      system: `You are ${assistantName}, a document collection assistant for ${practiceName}. Your ONLY job is to collect ${documentType} from clients.
 
 STRICT RULES:
 - ONLY discuss document collection and receipt
@@ -45,6 +46,7 @@ STRICT RULES:
 - NEVER make promises about deadlines or service delivery
 - If asked about anything else, politely redirect to document collection
 - Do not engage in general conversation
+- Always introduce yourself as "${assistantName} from ${practiceName}"
 
 If client asks about something outside your scope, respond: "I'm just here to help collect your documents. For questions about [their topic], please contact ${practiceName} directly."`,
       messages: [
@@ -52,8 +54,9 @@ If client asks about something outside your scope, respond: "I'm just here to he
           role: 'user',
           content: `Write a warm, professional WhatsApp message to ${clientName} requesting their ${documentType} for ${period}.
 
-Keep it:
-- Friendly and conversational (like a real person)
+IMPORTANT:
+- Introduce yourself as "${assistantName} from ${practiceName}"
+- Keep it friendly and conversational (like a real person)
 - Brief (2-3 sentences max)
 - Clear about what you need
 - Use an emoji if appropriate
@@ -69,7 +72,7 @@ Just write the message, nothing else.`,
   } catch (error) {
     console.error('❌ Claude API error:', error);
     // Return fallback message
-    return `Hi ${clientName}! 👋\n\nThis is Amy from ${practiceName}. We need your ${documentType} for ${period} to complete your accounting.\n\nCould you please send them as a PDF or photo? Thanks!`;
+    return `Hi ${clientName}! 👋\n\nThis is ${assistantName} from ${practiceName}. We need your ${documentType} for ${period} to complete your accounting.\n\nCould you please send them as a PDF or photo? Thanks!`;
   }
 }
 
@@ -138,7 +141,8 @@ export async function generateResponse(
   campaignId: string,
   practiceName: string,
   documentType: string,
-  period: string
+  period: string,
+  assistantName: string = 'Amy'
 ): Promise<string> {
   if (!client) {
     return `Thanks for your message! I'll review it and get back to you shortly.`;
@@ -156,7 +160,7 @@ export async function generateResponse(
     );
 
     const conversationHistory = messagesResult.rows
-      .map((m) => `${m.direction === 'inbound' ? clientName : 'Amy'}: ${m.body}`)
+      .map((m) => `${m.direction === 'inbound' ? clientName : assistantName}: ${m.body}`)
       .join('\n');
 
     // Check if client sent a document (inferred from message content)
@@ -165,7 +169,7 @@ export async function generateResponse(
                        clientMessage.toLowerCase().includes('file') ||
                        clientMessage.toLowerCase().includes('attached');
 
-    const systemPrompt = `You are Amy, a document collection assistant for ${practiceName}. Your ONLY job is to collect ${documentType} for ${period} from ${clientName}.
+    const systemPrompt = `You are ${assistantName}, a document collection assistant for ${practiceName}. Your ONLY job is to collect ${documentType} for ${period} from ${clientName}.
 
 STRICT GUARDRAILS - YOU MUST FOLLOW THESE:
 1. ONLY discuss: document collection, receipt confirmation, document format questions
@@ -222,23 +226,25 @@ export async function generateReminderMessage(
   documentType: string,
   period: string,
   practiceName: string,
-  dayNumber: number
+  dayNumber: number,
+  assistantName: string = 'Amy'
 ): Promise<string> {
   if (!client) {
-    return `Hi ${clientName}, just a friendly reminder that we still need your ${documentType} for ${period}. Could you send them when you get a chance? Thanks!`;
+    return `Hi ${clientName}, this is ${assistantName} from ${practiceName}. Just a friendly reminder that we still need your ${documentType} for ${period}. Could you send them when you get a chance? Thanks!`;
   }
 
   try {
     const response = await client.messages.create({
       model: 'claude-3-5-haiku-20241022',
       max_tokens: 400,
-      system: `You are Amy, a document collection assistant for ${practiceName}. Your ONLY job is to collect documents.
+      system: `You are ${assistantName}, a document collection assistant for ${practiceName}. Your ONLY job is to collect documents.
 
 STRICT RULES:
 - ONLY discuss document collection
 - NEVER give advice, discuss pricing, or make promises about deadlines
 - Do not engage beyond document collection
-- Keep it professional and focused`,
+- Keep it professional and focused
+- Always sign messages as "${assistantName}"`,
       messages: [
         {
           role: 'user',
@@ -250,6 +256,7 @@ Keep it:
 - Understanding but clear about the need
 - Use an emoji if appropriate
 - Focus ONLY on requesting the documents
+- Sign as "${assistantName}"
 
 Just write the message, nothing else.`,
         },
@@ -260,6 +267,6 @@ Just write the message, nothing else.`,
     return message.trim();
   } catch (error) {
     console.error('❌ Claude API error:', error);
-    return `Hi ${clientName}, just a friendly reminder that we still need your ${documentType} for ${period}. Could you send them when you get a chance? Thanks!`;
+    return `Hi ${clientName}, this is ${assistantName} from ${practiceName}. Just a friendly reminder that we still need your ${documentType} for ${period}. Could you send them when you get a chance? Thanks!`;
   }
 }
