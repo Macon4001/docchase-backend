@@ -32,34 +32,38 @@ export async function sendWhatsApp(
   const formattedFrom = twilioPhone!.startsWith('whatsapp:') ? twilioPhone : `whatsapp:${twilioPhone}`;
 
   try {
-    // Send via Twilio
+    // Send via Twilio with status callback
+    const statusCallbackUrl = process.env.TWILIO_STATUS_CALLBACK_URL ||
+                               `${process.env.API_URL}/api/webhooks/twilio/status`;
+
     const twilioMessage = await client.messages.create({
       from: formattedFrom,
       to: formattedTo,
       body,
+      statusCallback: statusCallbackUrl,
     });
 
-    // Store in database
+    // Store in database with initial status
     const result = await db.query<Message>(
       `INSERT INTO messages
-       (accountant_id, client_id, campaign_id, direction, sender, body, twilio_sid)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       (accountant_id, client_id, campaign_id, direction, sender, body, twilio_sid, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING *`,
-      [accountantId, clientId, campaignId || null, 'outbound', 'system', body, twilioMessage.sid]
+      [accountantId, clientId, campaignId || null, 'outbound', 'system', body, twilioMessage.sid, twilioMessage.status || 'queued']
     );
 
-    console.log(`✅ WhatsApp sent to ${to} - SID: ${twilioMessage.sid}`);
+    console.log(`✅ WhatsApp sent to ${to} - SID: ${twilioMessage.sid} - Status: ${twilioMessage.status}`);
     return result.rows[0];
   } catch (error) {
     console.error('❌ Failed to send WhatsApp:', error);
 
-    // Store failed message in database
+    // Store failed message in database with failed status
     const result = await db.query<Message>(
       `INSERT INTO messages
-       (accountant_id, client_id, campaign_id, direction, sender, body)
-       VALUES ($1, $2, $3, $4, $5, $6)
+       (accountant_id, client_id, campaign_id, direction, sender, body, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *`,
-      [accountantId, clientId, campaignId || null, 'outbound', 'system', body]
+      [accountantId, clientId, campaignId || null, 'outbound', 'system', body, 'failed']
     );
 
     throw error;
