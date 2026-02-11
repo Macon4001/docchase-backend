@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
 import { db } from '../lib/db.js';
 import { parseTwilioWebhook, TwilioWebhookPayload, sendWhatsApp } from '../lib/twilio.js';
-import { generateResponse } from '../lib/claude.js';
+import { generateResponse, shouldRespondToMessage } from '../lib/claude.js';
 import { processDocument } from '../lib/banktofile.js';
 import { createNotification } from './notifications.js';
 import { Message, Client, Campaign, Document } from '../types/index.js';
@@ -133,34 +133,41 @@ router.post('/twilio', async (req: Request, res: Response): Promise<void> => {
       });
     }
 
-    // Get accountant practice name for Amy's response
-    const accountantResult = await db.query<{ practice_name: string }>(
-      `SELECT practice_name FROM accountants WHERE id = $1`,
-      [campaign.accountant_id]
-    );
-    const practiceName = accountantResult.rows[0]?.practice_name || 'your accountant';
+    // Check if we should respond to this message
+    const shouldRespond = await shouldRespondToMessage(webhook.Body, hasMedia);
 
-    // Generate Amy's response using Claude
-    const amyResponse = await generateResponse(
-      client.id,
-      client.name,
-      webhook.Body,
-      campaign.id,
-      practiceName,
-      campaign.document_type,
-      campaign.period
-    );
+    if (shouldRespond) {
+      // Get accountant practice name for Amy's response
+      const accountantResult = await db.query<{ practice_name: string }>(
+        `SELECT practice_name FROM accountants WHERE id = $1`,
+        [campaign.accountant_id]
+      );
+      const practiceName = accountantResult.rows[0]?.practice_name || 'your accountant';
 
-    // Send Amy's response
-    await sendWhatsApp(
-      clientPhone,
-      amyResponse,
-      campaign.accountant_id,
-      client.id,
-      campaign.id
-    );
+      // Generate Amy's response using Claude
+      const amyResponse = await generateResponse(
+        client.id,
+        client.name,
+        webhook.Body,
+        campaign.id,
+        practiceName,
+        campaign.document_type,
+        campaign.period
+      );
 
-    console.log(`✅ Amy responded to ${client.name}: "${amyResponse}"`);
+      // Send Amy's response
+      await sendWhatsApp(
+        clientPhone,
+        amyResponse,
+        campaign.accountant_id,
+        client.id,
+        campaign.id
+      );
+
+      console.log(`✅ Amy responded to ${client.name}: "${amyResponse}"`);
+    } else {
+      console.log(`⏭️ Skipped response to ${client.name} - message doesn't require reply`);
+    }
 
     // Return empty response to Twilio (prevents duplicate messages)
     res.status(200).send('');

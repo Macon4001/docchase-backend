@@ -74,6 +74,60 @@ Just write the message, nothing else.`,
 }
 
 /**
+ * Determines if a client message requires a response from Amy
+ * Returns true if Amy should respond, false if message is just acknowledgment/noise
+ */
+export async function shouldRespondToMessage(
+  clientMessage: string,
+  hasMedia: boolean
+): Promise<boolean> {
+  const lowerMsg = clientMessage.toLowerCase().trim();
+
+  // If they sent media/document, check if the text is just a filler message
+  if (hasMedia) {
+    const fillerPhrases = [
+      'here you go',
+      'here it is',
+      'here',
+      'attached',
+      'sent',
+      'done',
+      'ok',
+      'okay',
+      'thanks',
+      'thank you',
+      'ty',
+      'there you go',
+      'sent it',
+      'sending',
+      'image',
+      'file',
+      'pdf',
+      'screenshot',
+      'pic',
+      'photo'
+    ];
+
+    // If message is very short (< 20 chars) and contains filler phrases, don't respond
+    if (lowerMsg.length < 20) {
+      const isFiller = fillerPhrases.some(phrase => lowerMsg.includes(phrase));
+      if (isFiller) {
+        console.log(`📝 Skipping response - message is just document acknowledgment: "${clientMessage}"`);
+        return false;
+      }
+    }
+  }
+
+  // Very short empty-ish messages don't need responses
+  if (lowerMsg.length < 3 || lowerMsg === '...' || lowerMsg === '.') {
+    console.log(`📝 Skipping response - message too short/empty: "${clientMessage}"`);
+    return false;
+  }
+
+  return true;
+}
+
+/**
  * Generate Amy's response to a client message
  * Analyzes conversation history and context
  */
