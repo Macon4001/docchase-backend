@@ -55,7 +55,7 @@ If client asks about something outside your scope, respond: "I'm just here to he
           content: `Write a warm, professional WhatsApp message to ${clientName} requesting their ${documentType} for ${period}.
 
 IMPORTANT:
-- Introduce yourself as "${assistantName} from ${practiceName}"
+- Start with "Hi ${clientName}, this is ${assistantName} from ${practiceName}."
 - Keep it friendly and conversational (like a real person)
 - Brief (2-3 sentences max)
 - Clear about what you need
@@ -272,12 +272,12 @@ STRICT RULES:
           content: `Write a ${dayNumber === 3 ? 'gentle' : 'slightly more urgent'} reminder WhatsApp message to ${clientName}. They haven't sent their ${documentType} for ${period} yet (it's been ${dayNumber} days).
 
 Keep it:
+- Start with "Hi ${clientName}, this is ${assistantName} from ${practiceName}."
 - Friendly but ${dayNumber > 3 ? 'slightly more firm' : 'gentle'}
 - Brief (2-3 sentences)
 - Understanding but clear about the need
 - Use an emoji if appropriate
 - Focus ONLY on requesting the documents
-- Sign as "${assistantName}"
 
 Just write the message, nothing else.`,
         },
