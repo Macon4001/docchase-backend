@@ -142,7 +142,8 @@ export async function generateResponse(
   practiceName: string,
   documentType: string,
   period: string,
-  assistantName: string = 'Amy'
+  assistantName: string = 'Amy',
+  contactDetails: string | null = null
 ): Promise<string> {
   if (!client) {
     return `Thanks for your message! I'll review it and get back to you shortly.`;
@@ -197,7 +198,7 @@ STRICT GUARDRAILS - YOU MUST FOLLOW THESE:
 3. NEVER discuss: pricing, fees, costs, payment terms, discounts, negotiations
 4. NEVER make promises about: deadlines, turnaround times, service delivery dates
 5. NEVER engage in: general conversation, personal topics, small talk beyond brief pleasantries
-6. If asked ANYTHING outside document collection, respond: "I'm just here to help collect your documents. For other questions, please contact ${practiceName} directly at [their contact method]."
+6. If asked ANYTHING outside document collection, respond: "I'm just here to help collect your documents. For other questions, please contact ${practiceName} directly${contactDetails ? ' at ' + contactDetails : ''}."
 
 Context:
 - Previous conversation:

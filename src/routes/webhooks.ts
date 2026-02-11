@@ -138,12 +138,17 @@ router.post('/twilio', async (req: Request, res: Response): Promise<void> => {
 
     if (shouldRespond) {
       // Get accountant details for response
-      const accountantResult = await db.query<{ practice_name: string; amy_name: string }>(
-        `SELECT practice_name, amy_name FROM accountants WHERE id = $1`,
+      const accountantResult = await db.query<{
+        practice_name: string;
+        amy_name: string;
+        contact_details: string | null;
+      }>(
+        `SELECT practice_name, amy_name, contact_details FROM accountants WHERE id = $1`,
         [campaign.accountant_id]
       );
       const practiceName = accountantResult.rows[0]?.practice_name || 'your accountant';
       const assistantName = accountantResult.rows[0]?.amy_name || 'Amy';
+      const contactDetails = accountantResult.rows[0]?.contact_details || null;
 
       // Generate assistant's response using Claude
       const assistantResponse = await generateResponse(
@@ -154,7 +159,8 @@ router.post('/twilio', async (req: Request, res: Response): Promise<void> => {
         practiceName,
         campaign.document_type,
         campaign.period,
-        assistantName
+        assistantName,
+        contactDetails
       );
 
       // Send assistant's response
