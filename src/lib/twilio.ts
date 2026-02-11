@@ -32,16 +32,22 @@ export async function sendWhatsApp(
   const formattedFrom = twilioPhone!.startsWith('whatsapp:') ? twilioPhone : `whatsapp:${twilioPhone}`;
 
   try {
-    // Send via Twilio with status callback
+    // Send via Twilio with status callback (only if URL is configured)
     const statusCallbackUrl = process.env.TWILIO_STATUS_CALLBACK_URL ||
-                               `${process.env.API_URL}/api/webhooks/twilio/status`;
+                               (process.env.API_URL ? `${process.env.API_URL}/api/webhooks/twilio/status` : null);
 
-    const twilioMessage = await client.messages.create({
+    const messageOptions: any = {
       from: formattedFrom,
       to: formattedTo,
       body,
-      statusCallback: statusCallbackUrl,
-    });
+    };
+
+    // Only add statusCallback if we have a valid URL
+    if (statusCallbackUrl && statusCallbackUrl.startsWith('http')) {
+      messageOptions.statusCallback = statusCallbackUrl;
+    }
+
+    const twilioMessage = await client.messages.create(messageOptions);
 
     // Store in database with initial status
     const result = await db.query<Message>(
