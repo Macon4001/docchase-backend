@@ -163,6 +163,26 @@ export async function generateResponse(
       .map((m) => `${m.direction === 'inbound' ? clientName : assistantName}: ${m.body}`)
       .join('\n');
 
+    // Check for recently received documents (last 60 seconds)
+    const recentDocumentsResult = await db.query<{ created_at: Date }>(
+      `SELECT created_at
+       FROM documents
+       WHERE client_id = $1
+         AND created_at > NOW() - INTERVAL '60 seconds'
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [clientId]
+    );
+
+    let documentContext = '';
+    if (recentDocumentsResult.rows.length > 0) {
+      const doc = recentDocumentsResult.rows[0];
+      const secondsAgo = Math.floor((Date.now() - new Date(doc.created_at).getTime()) / 1000);
+
+      documentContext = `\n\nIMPORTANT: A ${documentType}${period ? ' for ' + period : ''} was received ${secondsAgo} seconds ago.
+If the client's message seems like a follow-up comment about sending a document (e.g., "there you go", "sent it", "here you are"), acknowledge the document they just sent.`;
+    }
+
     // Check if client sent a document (inferred from message content)
     const hasDocument = clientMessage.toLowerCase().includes('image') ||
                        clientMessage.toLowerCase().includes('pdf') ||
@@ -185,7 +205,7 @@ ${conversationHistory}
 
 ${clientName} just sent: "${clientMessage}"
 
-${hasDocument ? `They sent a document. Thank them warmly and confirm receipt. Keep it brief.` : `Respond ONLY if it's about documents. If they're asking about anything else (advice, pricing, services, deadlines), redirect them to contact ${practiceName} directly.`}
+${hasDocument ? `They sent a document. Thank them warmly and confirm receipt. Keep it brief.` : `Respond ONLY if it's about documents. If they're asking about anything else (advice, pricing, services, deadlines), redirect them to contact ${practiceName} directly.`}${documentContext}
 
 Keep your response:
 - Warm but focused on documents only
