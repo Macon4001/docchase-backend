@@ -124,8 +124,10 @@ router.post('/twilio', async (req: Request, res: Response): Promise<void> => {
         document.id,
         campaign.accountant_id,
         campaign.id,
-        campaign.name,
+        campaign.document_type,
+        campaign.period,
         client.name,
+        client.phone,
         webhook.MediaUrl0,
         webhook.MediaContentType0 || 'unknown'
       ).catch(error => {

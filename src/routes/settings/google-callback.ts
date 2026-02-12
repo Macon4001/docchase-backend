@@ -1,5 +1,5 @@
 import express, { Request, Response } from 'express';
-import { getTokensFromCode, getOrCreateAmyFolder, storeGoogleTokens } from '../../lib/google-drive.js';
+import { getTokensFromCode, getOrCreateRootFolder, storeGoogleTokens } from '../../lib/google-drive.js';
 
 const router = express.Router();
 
@@ -34,11 +34,11 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
     // Exchange code for tokens
     const tokens = await getTokensFromCode(code);
 
-    // Create the main Amy folder in their Drive
-    const amyFolder = await getOrCreateAmyFolder(tokens);
+    // Create the GettingDocs root folder in their Drive
+    const rootFolder = await getOrCreateRootFolder(tokens);
 
     // Store tokens and folder ID in database
-    await storeGoogleTokens(accountantId, tokens, amyFolder.id);
+    await storeGoogleTokens(accountantId, tokens, rootFolder.id);
 
     // Redirect back to settings with success
     // In production, redirect to frontend URL

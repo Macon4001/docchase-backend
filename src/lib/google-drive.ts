@@ -162,36 +162,19 @@ export async function createFolder(
 }
 
 /**
- * Create a subfolder for a specific client
- * @param tokens - The accountant's Google tokens
- * @param parentFolderId - The main Amy folder ID
- * @param clientName - The client's name
- * @returns The created folder metadata
- */
-export async function createClientFolder(
-  tokens: GoogleTokens,
-  parentFolderId: string,
-  clientName: string
-): Promise<{ id: string; name: string; webViewLink: string }> {
-  // Sanitize client name for folder
-  const safeName = clientName.replace(/[^a-zA-Z0-9 ]/g, '').trim();
-  return createFolder(tokens, safeName, parentFolderId);
-}
-
-/**
- * Get or create the main Amy folder
+ * Get or create the root "GettingDocs" folder
  * @param tokens - The accountant's Google tokens
  * @returns The folder metadata
  */
-export async function getOrCreateAmyFolder(tokens: GoogleTokens): Promise<{ id: string; name: string; webViewLink: string }> {
+export async function getOrCreateRootFolder(tokens: GoogleTokens): Promise<{ id: string; name: string; webViewLink: string }> {
   const oauth2Client = getOAuthClient();
   oauth2Client.setCredentials(tokens);
 
   const drive = google.drive({ version: 'v3', auth: oauth2Client });
 
-  // Search for existing Amy folder
+  // Search for existing GettingDocs folder
   const response = await drive.files.list({
-    q: "name = 'Amy Documents' and mimeType = 'application/vnd.google-apps.folder' and trashed = false",
+    q: "name = 'GettingDocs' and mimeType = 'application/vnd.google-apps.folder' and trashed = false",
     fields: 'files(id, name, webViewLink)',
     spaces: 'drive'
   });
@@ -201,14 +184,155 @@ export async function getOrCreateAmyFolder(tokens: GoogleTokens): Promise<{ id: 
   }
 
   // Create if doesn't exist
-  return createFolder(tokens, 'Amy Documents');
+  console.log('📁 Creating GettingDocs root folder...');
+  return createFolder(tokens, 'GettingDocs');
+}
+
+/**
+ * Get or create a client folder with phone suffix
+ * Format: {Client Name} ({last 7 digits of phone})
+ * Example: John Smith (7700123)
+ *
+ * @param tokens - The accountant's Google tokens
+ * @param rootFolderId - The GettingDocs folder ID
+ * @param clientName - The client's name
+ * @param clientPhone - The client's phone number
+ * @returns The folder metadata
+ */
+export async function getOrCreateClientFolder(
+  tokens: GoogleTokens,
+  rootFolderId: string,
+  clientName: string,
+  clientPhone: string
+): Promise<{ id: string; name: string; webViewLink: string }> {
+  const oauth2Client = getOAuthClient();
+  oauth2Client.setCredentials(tokens);
+
+  const drive = google.drive({ version: 'v3', auth: oauth2Client });
+
+  // Generate folder name with phone suffix (last 7 digits)
+  const phoneSuffix = clientPhone.slice(-7);
+  const sanitizedName = clientName.replace(/[^a-zA-Z0-9 ]/g, '').trim();
+  const folderName = `${sanitizedName} (${phoneSuffix})`;
+
+  // Search for existing folder
+  const escapedFolderName = folderName.replace(/'/g, "\\'");
+  const response = await drive.files.list({
+    q: `name = '${escapedFolderName}' and '${rootFolderId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
+    fields: 'files(id, name, webViewLink)',
+    spaces: 'drive'
+  });
+
+  if (response.data.files && response.data.files.length > 0) {
+    return response.data.files[0] as any;
+  }
+
+  // Create if doesn't exist
+  console.log(`📁 Creating client folder: ${folderName}`);
+  return createFolder(tokens, folderName, rootFolderId);
+}
+
+/**
+ * Generate document filename based on naming convention
+ * Format: {Document_Type}_{Period}_{Year}.{extension}
+ * Example: Bank_Statement_January_2026.pdf
+ *
+ * @param documentType - Type of document (e.g., "Bank Statement")
+ * @param period - Period (e.g., "January", "Q1", or empty string)
+ * @param year - Year (e.g., "2026")
+ * @param extension - File extension (e.g., "pdf", "csv")
+ * @returns The formatted filename
+ */
+export function generateDocumentFilename(
+  documentType: string,
+  period: string,
+  year: string,
+  extension: string
+): string {
+  // Sanitize document type (replace spaces with underscores, remove special chars)
+  const sanitizedType = documentType
+    .replace(/[^a-zA-Z0-9 ]/g, '')
+    .replace(/\s+/g, '_');
+
+  // Sanitize period (if provided)
+  const sanitizedPeriod = period
+    ? period.replace(/[^a-zA-Z0-9 ]/g, '').replace(/\s+/g, '_')
+    : '';
+
+  // Build filename
+  if (sanitizedPeriod) {
+    return `${sanitizedType}_${sanitizedPeriod}_${year}.${extension}`;
+  } else {
+    return `${sanitizedType}_${year}.${extension}`;
+  }
+}
+
+/**
+ * Check if a file exists in a folder
+ * @param tokens - The accountant's Google tokens
+ * @param folderId - The folder ID to check in
+ * @param filename - The filename to check
+ * @returns True if file exists, false otherwise
+ */
+async function checkFileExists(
+  tokens: GoogleTokens,
+  folderId: string,
+  filename: string
+): Promise<boolean> {
+  const oauth2Client = getOAuthClient();
+  oauth2Client.setCredentials(tokens);
+
+  const drive = google.drive({ version: 'v3', auth: oauth2Client });
+
+  const escapedFilename = filename.replace(/'/g, "\\'");
+  const response = await drive.files.list({
+    q: `name = '${escapedFilename}' and '${folderId}' in parents and trashed = false`,
+    fields: 'files(id, name)',
+    spaces: 'drive'
+  });
+
+  return !!(response.data.files && response.data.files.length > 0);
+}
+
+/**
+ * Generate a unique filename by appending timestamp if duplicate exists
+ * @param tokens - The accountant's Google tokens
+ * @param folderId - The folder ID to check in
+ * @param baseFilename - The base filename
+ * @returns The unique filename
+ */
+async function generateUniqueFilename(
+  tokens: GoogleTokens,
+  folderId: string,
+  baseFilename: string
+): Promise<string> {
+  // Check if file already exists
+  const exists = await checkFileExists(tokens, folderId, baseFilename);
+
+  if (!exists) {
+    return baseFilename;
+  }
+
+  // Append timestamp to make unique
+  const timestamp = Date.now();
+  const lastDotIndex = baseFilename.lastIndexOf('.');
+
+  if (lastDotIndex === -1) {
+    // No extension
+    return `${baseFilename}_${timestamp}`;
+  }
+
+  const nameWithoutExt = baseFilename.substring(0, lastDotIndex);
+  const ext = baseFilename.substring(lastDotIndex + 1);
+
+  return `${nameWithoutExt}_${timestamp}.${ext}`;
 }
 
 /**
  * Store Google tokens for an accountant
  * @param accountantId - The accountant's ID
  * @param tokens - The Google OAuth tokens
- * @param folderId - The main Amy folder ID
+ * @param folderId - The GettingDocs folder ID
  */
 export async function storeGoogleTokens(
   accountantId: string,
@@ -279,19 +403,39 @@ export async function disconnectGoogleDrive(accountantId: string): Promise<void>
 }
 
 /**
- * Upload a file from a URL to Google Drive (for campaign documents)
- * Downloads the file from Twilio and uploads it to the accountant's Google Drive
+ * Upload a campaign document to Google Drive using the GettingDocs structure
+ *
+ * Structure:
+ *   GettingDocs/
+ *   └── John Smith (7700123)/
+ *       ├── Bank_Statement_January_2026.pdf
+ *       └── Bank_Statement_January_2026.csv
+ *
+ * @param accountantId - The accountant's ID
+ * @param campaignId - The campaign ID
+ * @param documentType - Type of document (e.g., "Bank Statement")
+ * @param period - Period (e.g., "January", "Q1")
+ * @param year - Year (e.g., "2026")
+ * @param clientName - The client's name
+ * @param clientPhone - The client's phone number
+ * @param fileUrl - URL to download the file from (Twilio)
+ * @param fileType - MIME type of the file
+ * @param documentId - The document ID in database
+ * @returns File upload result
  */
 export async function uploadCampaignDocument(
   accountantId: string,
-  campaignId: string,
-  campaignName: string,
+  _campaignId: string,
+  documentType: string,
+  period: string,
+  year: string,
   clientName: string,
+  clientPhone: string,
   fileUrl: string,
   fileType: string,
   documentId: string
-): Promise<{ driveFileId: string; driveFileUrl: string }> {
-  // Get accountant's Google tokens
+): Promise<{ driveFileId: string; driveFileUrl: string; driveFileName: string }> {
+  // 1. Get accountant's Google tokens
   const accountantData = await getAccountantTokens(accountantId);
 
   if (!accountantData) {
@@ -300,51 +444,65 @@ export async function uploadCampaignDocument(
 
   let { tokens, folderId } = accountantData;
 
-  // Refresh tokens if needed
+  // 2. Refresh tokens if needed
   const freshTokens = await refreshTokensIfNeeded(tokens);
 
-  // If tokens were refreshed, save them (temporary, we'll save with folder ID later)
+  // If tokens were refreshed, update them
   if (freshTokens !== tokens) {
     tokens = freshTokens;
   }
 
-  // ALWAYS ensure Amy Documents folder exists (get or create)
+  // 3. Get or create root GettingDocs folder
   if (!folderId) {
-    console.log('📁 No Amy Documents folder found, creating one...');
-    const amyFolder = await getOrCreateAmyFolder(freshTokens);
-    folderId = amyFolder.id;
-    console.log(`✅ Amy Documents folder ready: ${amyFolder.webViewLink}`);
+    console.log('📁 No GettingDocs folder found, creating one...');
+    const rootFolder = await getOrCreateRootFolder(freshTokens);
+    folderId = rootFolder.id;
+    console.log(`✅ GettingDocs folder ready: ${rootFolder.webViewLink}`);
 
     // Save the folder ID to database
     await storeGoogleTokens(accountantId, freshTokens, folderId);
   } else {
-    // Verify the folder still exists, if not create a new one
+    // Verify the folder still exists
     try {
       const oauth2Client = getOAuthClient();
       oauth2Client.setCredentials(freshTokens);
       const drive = google.drive({ version: 'v3', auth: oauth2Client });
 
-      await drive.files.get({
+      const folderCheck = await drive.files.get({
         fileId: folderId,
         fields: 'id, name, trashed'
       });
 
-      console.log(`✅ Using existing Amy Documents folder: ${folderId}`);
+      // Check if folder is trashed
+      if ((folderCheck.data as any).trashed) {
+        throw new Error('Folder is trashed');
+      }
+
+      console.log(`✅ Using existing GettingDocs folder`);
     } catch (error) {
-      console.log('⚠️ Stored Amy Documents folder not found or deleted, creating new one...');
-      const amyFolder = await getOrCreateAmyFolder(freshTokens);
-      folderId = amyFolder.id;
-      console.log(`✅ New Amy Documents folder created: ${amyFolder.webViewLink}`);
+      console.log('⚠️ Stored GettingDocs folder not found or deleted, creating new one...');
+      const rootFolder = await getOrCreateRootFolder(freshTokens);
+      folderId = rootFolder.id;
+      console.log(`✅ New GettingDocs folder created: ${rootFolder.webViewLink}`);
 
       // Update the folder ID in database
       await storeGoogleTokens(accountantId, freshTokens, folderId);
     }
   }
 
-  // Download the file from Twilio URL
+  // 4. Get or create client folder with phone suffix
+  const clientFolder = await getOrCreateClientFolder(
+    freshTokens,
+    folderId,
+    clientName,
+    clientPhone
+  );
+
+  console.log(`📁 Using client folder: ${clientFolder.name}`);
+
+  // 5. Download the file from Twilio URL
   const axios = (await import('axios')).default;
 
-  // Twilio requires authentication for media URLs
   const twilioAccountSid = process.env.TWILIO_ACCOUNT_SID;
   const twilioAuthToken = process.env.TWILIO_AUTH_TOKEN;
 
@@ -364,32 +522,19 @@ export async function uploadCampaignDocument(
 
   const fileBuffer = Buffer.from(response.data);
 
-  // Extract filename from document or generate one
-  const documentResult = await db.query<{ id: string }>(
-    `SELECT id FROM documents WHERE id = $1`,
-    [documentId]
-  );
-
-  if (documentResult.rows.length === 0) {
-    throw new Error('Document not found in database');
-  }
-
-  // Generate a safe filename
-  const safeClientName = clientName.replace(/[^a-zA-Z0-9]/g, '_');
-  const safeCampaignName = campaignName.replace(/[^a-zA-Z0-9]/g, '_');
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
+  // 6. Generate filename based on naming convention
   const extension = fileType.includes('pdf') ? 'pdf' : fileType.includes('image') ? 'jpg' : 'file';
-  const filename = `${safeClientName}_${safeCampaignName}_${timestamp}.${extension}`;
+  const baseFilename = generateDocumentFilename(documentType, period, year, extension);
 
-  // Get or create client subfolder
-  const clientFolderData = await createClientFolder(freshTokens, folderId, clientName);
+  // 7. Check for duplicates and get final unique filename
+  const filename = await generateUniqueFilename(freshTokens, clientFolder.id, baseFilename);
 
-  console.log(`📁 Uploading to Google Drive folder: ${clientFolderData.name}`);
+  console.log(`📄 Uploading file: ${filename}`);
 
-  // Upload file to Google Drive
+  // 8. Upload file to Google Drive
   const uploadResult = await uploadToGoogleDrive(
     freshTokens,
-    clientFolderData.id,
+    clientFolder.id,
     filename,
     fileBuffer,
     fileType
@@ -397,25 +542,27 @@ export async function uploadCampaignDocument(
 
   console.log(`✅ File uploaded to Google Drive: ${uploadResult.webViewLink}`);
 
-  // Update document record with Google Drive info
+  // 9. Update document record with Google Drive info
   await db.query(
     `UPDATE documents
      SET drive_file_id = $1,
-         drive_file_url = $2
-     WHERE id = $3`,
-    [uploadResult.id, uploadResult.webViewLink, documentId]
+         drive_file_url = $2,
+         original_filename = $3,
+         drive_folder_id = $4
+     WHERE id = $5`,
+    [uploadResult.id, uploadResult.webViewLink, filename, clientFolder.id, documentId]
   );
 
-  // Create notification for document uploaded to Drive
+  // 10. Create notification for document uploaded to Drive
   try {
     const { createNotification } = await import('../routes/notifications.js');
     await createNotification(
       accountantId,
       'document_uploaded',
       'Document Saved to Drive',
-      `${clientName}'s document has been saved to Google Drive`,
+      `${clientName}'s ${documentType} has been saved to Google Drive`,
       clientName,
-      campaignName
+      `${documentType} - ${period} ${year}`
     );
   } catch (notifError) {
     console.error('Failed to create notification:', notifError);
@@ -424,6 +571,7 @@ export async function uploadCampaignDocument(
 
   return {
     driveFileId: uploadResult.id,
-    driveFileUrl: uploadResult.webViewLink
+    driveFileUrl: uploadResult.webViewLink,
+    driveFileName: filename
   };
 }

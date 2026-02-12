@@ -110,8 +110,10 @@ export async function processDocument(
   documentId: string,
   accountantId: string,
   campaignId: string,
-  campaignName: string,
+  documentType: string,
+  period: string,
   clientName: string,
+  clientPhone: string,
   fileUrl: string,
   fileType: string
 ): Promise<{
@@ -124,12 +126,25 @@ export async function processDocument(
   const { uploadCampaignDocument } = await import('./google-drive.js');
 
   try {
+    // Extract year from period (e.g., "January 2026" -> "2026" or just use current year)
+    const currentYear = new Date().getFullYear().toString();
+    let year = currentYear;
+
+    // Try to extract year from period if it contains one
+    const yearMatch = period.match(/\d{4}/);
+    if (yearMatch) {
+      year = yearMatch[0];
+    }
+
     // Step 1: Upload to Google Drive
     const { driveFileId, driveFileUrl } = await uploadCampaignDocument(
       accountantId,
       campaignId,
-      campaignName,
+      documentType,
+      period.replace(/\s*\d{4}\s*/g, '').trim(), // Remove year from period
+      year,
       clientName,
+      clientPhone,
       fileUrl,
       fileType,
       documentId
