@@ -6,7 +6,7 @@ const authToken = process.env.TWILIO_AUTH_TOKEN;
 const client = twilio(accountSid, authToken);
 
 // Check the status of the most recent message
-const messageSid = 'SM5985648e3632327e207534999109a674';
+const messageSid = 'SMb03e31ed4a3d6d963be9e62134df0641';
 
 async function checkMessageStatus() {
   try {
