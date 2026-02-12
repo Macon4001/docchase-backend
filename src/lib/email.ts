@@ -1,45 +1,36 @@
-import nodemailer from 'nodemailer';
+import * as brevo from '@getbrevo/brevo';
 import { db } from './db.js';
 
-// SMTP Configuration from environment variables
-const SMTP_HOST = process.env.SMTP_HOST;
-const SMTP_PORT = process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT) : 587;
-const SMTP_SECURE = process.env.SMTP_SECURE === 'true'; // true for 465, false for other ports
-const SMTP_USER = process.env.SMTP_USER;
-const SMTP_PASS = process.env.SMTP_PASS;
-const EMAIL_FROM = process.env.EMAIL_FROM || 'DocChase <noreply@gettingdocs.com>';
+// Brevo API Configuration
+const BREVO_API_KEY = process.env.BREVO_API_KEY;
+const EMAIL_FROM_NAME = process.env.EMAIL_FROM_NAME || 'DocChase';
+const EMAIL_FROM_EMAIL = process.env.EMAIL_FROM_EMAIL || 'noreply@gettingdocs.com';
 
-// Check if SMTP is configured
-const isEmailConfigured = !!SMTP_HOST && !!SMTP_USER && !!SMTP_PASS;
+// Check if Brevo is configured
+const isEmailConfigured = !!BREVO_API_KEY;
 
 if (!isEmailConfigured) {
-  console.warn('⚠️  SMTP not configured. Email notifications will be disabled.');
-  console.warn('   Set SMTP_HOST, SMTP_USER, and SMTP_PASS environment variables to enable email.');
+  console.warn('⚠️  Brevo API Key not configured. Email notifications will be disabled.');
+  console.warn('   Set BREVO_API_KEY environment variable to enable email.');
 } else {
-  console.log(`✅ SMTP configured: ${SMTP_HOST}:${SMTP_PORT} (from: ${EMAIL_FROM})`);
+  console.log(`✅ Brevo API configured (from: ${EMAIL_FROM_NAME} <${EMAIL_FROM_EMAIL}>)`);
 }
 
 /**
- * Create a Nodemailer transporter
+ * Get configured Brevo API instance
  */
-function createTransporter() {
-  if (!isEmailConfigured) {
-    throw new Error('SMTP is not configured');
+function getBrevoApi() {
+  if (!isEmailConfigured || !BREVO_API_KEY) {
+    throw new Error('Brevo API Key is not configured');
   }
 
-  return nodemailer.createTransport({
-    host: SMTP_HOST,
-    port: SMTP_PORT,
-    secure: SMTP_SECURE,
-    auth: {
-      user: SMTP_USER,
-      pass: SMTP_PASS,
-    },
-  });
+  const apiInstance = new brevo.TransactionalEmailsApi();
+  apiInstance.setApiKey(brevo.TransactionalEmailsApiApiKeys.apiKey, BREVO_API_KEY);
+  return apiInstance;
 }
 
 /**
- * Send an email
+ * Send an email using Brevo API
  * @param to - Recipient email address
  * @param subject - Email subject
  * @param html - HTML content
@@ -51,33 +42,40 @@ export async function sendEmail(
   html: string,
   text?: string
 ): Promise<boolean> {
-  // If SMTP not configured, log and return false
+  // If Brevo not configured, log and return false
   if (!isEmailConfigured) {
-    console.log(`📧 Email not sent (SMTP not configured): ${subject} → ${to}`);
+    console.log(`📧 Email not sent (Brevo not configured): ${subject} → ${to}`);
     return false;
   }
 
   try {
-    const transporter = createTransporter();
+    const apiInstance = getBrevoApi();
 
-    const info = await transporter.sendMail({
-      from: EMAIL_FROM,
-      to,
-      subject,
-      html,
-      text: text || stripHtml(html), // Generate plain text from HTML if not provided
-    });
+    const sendSmtpEmail = new brevo.SendSmtpEmail();
+    sendSmtpEmail.subject = subject;
+    sendSmtpEmail.htmlContent = html;
+    sendSmtpEmail.textContent = text || stripHtml(html);
+    sendSmtpEmail.sender = {
+      name: EMAIL_FROM_NAME,
+      email: EMAIL_FROM_EMAIL
+    };
+    sendSmtpEmail.to = [{ email: to }];
 
-    console.log(`✅ Email sent: ${subject} → ${to} (MessageID: ${info.messageId})`);
+    const result = await apiInstance.sendTransacEmail(sendSmtpEmail);
+
+    console.log(`✅ Email sent via Brevo: ${subject} → ${to} (MessageID: ${result.body.messageId})`);
     return true;
-  } catch (error) {
-    console.error(`❌ Failed to send email to ${to}:`, error);
+  } catch (error: any) {
+    console.error(`❌ Failed to send email via Brevo to ${to}:`, error.message || error);
+    if (error.response?.body) {
+      console.error('Brevo API Error:', error.response.body);
+    }
     return false;
   }
 }
 
 /**
- * Send a test email to verify SMTP configuration
+ * Send a test email to verify Brevo configuration
  * @param to - Recipient email address
  */
 export async function sendTestEmail(to: string): Promise<boolean> {
@@ -85,7 +83,7 @@ export async function sendTestEmail(to: string): Promise<boolean> {
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <h2 style="color: #10b981;">✅ Email Notifications Working!</h2>
-      <p>This is a test email from DocChase to confirm your SMTP settings are configured correctly.</p>
+      <p>This is a test email from DocChase to confirm your Brevo integration is configured correctly.</p>
       <p>You will now receive email notifications for:</p>
       <ul>
         <li>📄 Document uploads</li>
@@ -96,7 +94,7 @@ export async function sendTestEmail(to: string): Promise<boolean> {
       <p>You can customize your email preferences in Settings.</p>
       <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
       <p style="color: #6b7280; font-size: 12px;">
-        This email was sent from DocChase. You can manage your notification preferences in your account settings.
+        This email was sent from DocChase via Brevo. You can manage your notification preferences in your account settings.
       </p>
     </div>
   `;
