@@ -127,13 +127,18 @@ export async function createNotification(
   campaignName?: string
 ): Promise<void> {
   try {
-    await db.query(
+    console.log(`🔔 Creating notification for accountant ${accountantId}: ${title}`);
+    const result = await db.query(
       `INSERT INTO notifications (accountant_id, type, title, message, client_name, campaign_name)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id`,
       [accountantId, type, title, message, clientName, campaignName]
     );
+    console.log(`✅ Notification created successfully: ${result.rows[0].id}`);
   } catch (error) {
-    console.error('Error creating notification:', error);
+    console.error('❌ Error creating notification:', error);
+    console.error('Notification details:', { accountantId, type, title, message, clientName, campaignName });
+    throw error; // Re-throw to see the error in calling code
   }
 }
 
