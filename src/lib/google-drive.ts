@@ -562,7 +562,11 @@ export async function uploadCampaignDocument(
       'Document Saved to Drive',
       `${clientName}'s ${documentType} has been saved to Google Drive`,
       clientName,
-      `${documentType} - ${period} ${year}`
+      `${documentType} - ${period} ${year}`,
+      {
+        documentType,
+        driveUrl: uploadResult.webViewLink
+      }
     );
   } catch (notifError) {
     console.error('Failed to create notification:', notifError);
