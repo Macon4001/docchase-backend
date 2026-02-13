@@ -1,7 +1,6 @@
 import cron from 'node-cron';
 import { db } from '../lib/db.js';
-import { sendWhatsApp } from '../lib/twilio.js';
-import { generateReminderMessage } from '../lib/claude.js';
+import { sendDocumentReminder } from '../lib/twilio.js';
 
 interface CampaignClient {
   id: string;
@@ -124,20 +123,14 @@ export async function sendReminder1(): Promise<{ success: number; failed: number
     // Send reminder to each client
     for (const client of clientsToSend) {
       try {
-        // Generate reminder message using Claude
-        const messageBody = await generateReminderMessage(
-          client.client_name,
-          client.document_type,
-          client.period,
-          client.practice_name,
-          client.reminder_1_days, // Use custom day number
-          client.amy_name || 'Amy' // Use custom assistant name
-        );
+        // Create document description (e.g., "January 2026 bank statement")
+        const documentDescription = `${client.period} ${client.document_type.replace('_', ' ')}`;
 
-        // Send WhatsApp message
-        await sendWhatsApp(
+        // Send WhatsApp reminder using approved template
+        await sendDocumentReminder(
           client.client_phone,
-          messageBody,
+          client.client_name,
+          documentDescription,
           client.accountant_id,
           client.client_id,
           client.campaign_id
@@ -238,18 +231,14 @@ export async function sendReminder2(): Promise<{ success: number; failed: number
 
     for (const client of clientsToSend) {
       try {
-        const messageBody = await generateReminderMessage(
-          client.client_name,
-          client.document_type,
-          client.period,
-          client.practice_name,
-          client.reminder_2_days, // Use custom day number
-          client.amy_name || 'Amy' // Use custom assistant name
-        );
+        // Create document description (e.g., "January 2026 bank statement")
+        const documentDescription = `${client.period} ${client.document_type.replace('_', ' ')}`;
 
-        await sendWhatsApp(
+        // Send WhatsApp reminder using approved template
+        await sendDocumentReminder(
           client.client_phone,
-          messageBody,
+          client.client_name,
+          documentDescription,
           client.accountant_id,
           client.client_id,
           client.campaign_id

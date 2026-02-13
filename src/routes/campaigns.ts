@@ -2,8 +2,7 @@ import express, { Request, Response } from 'express';
 import { db } from '../lib/db.js';
 import { authenticate } from '../middleware/auth.js';
 import { AuthenticatedRequest, Campaign, Client } from '../types/index.js';
-import { sendWhatsApp } from '../lib/twilio.js';
-import { generateInitialMessage } from '../lib/claude.js';
+import { sendDocumentRequest } from '../lib/twilio.js';
 
 const router = express.Router();
 
@@ -257,34 +256,17 @@ router.post('/:id/start', authenticate, async (req: Request, res: Response): Pro
       try {
         console.log(`📤 Preparing message for ${client.name}...`);
 
-        // Use custom initial message if provided, otherwise generate with Claude AI
-        let messageBody: string;
-        if (campaign.initial_message) {
-          // Replace variables in the custom template
-          messageBody = campaign.initial_message
-            .replace(/{client_name}/g, client.name)
-            .replace(/{practice_name}/g, practiceName)
-            .replace(/{document_type}/g, campaign.document_type.replace('_', ' '))
-            .replace(/{period}/g, campaign.period);
-          console.log(`   Using custom template`);
-        } else {
-          // Fallback to AI-generated message
-          messageBody = await generateInitialMessage(
-            client.name,
-            campaign.document_type,
-            campaign.period,
-            practiceName,
-            assistantName
-          );
-          console.log(`   Generated with Claude AI`);
-        }
+        // Create document description (e.g., "January 2026 bank statement")
+        const documentDescription = `${campaign.period} ${campaign.document_type.replace('_', ' ')}`;
 
-        console.log(`📱 Sending WhatsApp to ${client.phone}...`);
+        console.log(`📱 Sending WhatsApp to ${client.phone} using approved template...`);
 
-        // Send WhatsApp message
-        await sendWhatsApp(
+        // Send WhatsApp message using approved Twilio template
+        await sendDocumentRequest(
           client.phone,
-          messageBody,
+          client.name,
+          practiceName,
+          documentDescription,
           accountantId,
           client.id,
           campaignId
