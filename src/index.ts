@@ -18,6 +18,7 @@ import testRemindersRouter from './routes/test-reminders.js';
 import contactRouter from './routes/contact.js';
 import blogRouter from './routes/blog.js';
 import { startScheduledJobs } from './services/reminder-service.js';
+import { startBlogScheduler } from './services/blog-scheduler.js';
 
 dotenv.config();
 
@@ -102,5 +103,9 @@ app.listen(PORT, () => {
 
   // Start scheduled reminder jobs
   startScheduledJobs();
-  console.log('⏰ Reminder scheduler initialized\n');
+  console.log('⏰ Reminder scheduler initialized');
+
+  // Start blog post scheduler
+  startBlogScheduler();
+  console.log('📝 Blog post scheduler initialized\n');
 });

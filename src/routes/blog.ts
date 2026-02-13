@@ -14,6 +14,7 @@ interface BlogPost {
   excerpt: string | null;
   author_id: string;
   published: boolean;
+  scheduled_publish_at: Date | null;
   created_at: Date;
   updated_at: Date;
   author_name?: string;
@@ -95,7 +96,7 @@ router.get('/:slug', async (req: Request, res: Response): Promise<void> => {
 router.post('/', authenticate, requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const authenticatedReq = req as AuthenticatedRequest;
-    const { title, slug, content, excerpt, published } = req.body;
+    const { title, slug, content, excerpt, published, scheduled_publish_at } = req.body;
 
     if (!title || !slug || !content) {
       res.status(400).json({ error: 'Title, slug, and content are required' });
@@ -114,13 +115,21 @@ router.post('/', authenticate, requireAdmin, async (req: Request, res: Response)
     }
 
     const result = await db.query<BlogPost>(
-      `INSERT INTO blog_posts (title, slug, content, excerpt, author_id, published)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO blog_posts (title, slug, content, excerpt, author_id, published, scheduled_publish_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *`,
-      [title, slug, content, excerpt || null, authenticatedReq.accountant.id, published || false]
+      [
+        title,
+        slug,
+        content,
+        excerpt || null,
+        authenticatedReq.accountant.id,
+        published || false,
+        scheduled_publish_at || null
+      ]
     );
 
-    console.log(`[Blog] Post created: "${title}" by ${authenticatedReq.accountant.email}`);
+    console.log(`[Blog] Post created: "${title}" by ${authenticatedReq.accountant.email}${scheduled_publish_at ? ` (scheduled for ${scheduled_publish_at})` : ''}`);
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('Error creating blog post:', error);
@@ -132,7 +141,7 @@ router.post('/', authenticate, requireAdmin, async (req: Request, res: Response)
 router.put('/:id', authenticate, requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { title, slug, content, excerpt, published } = req.body;
+    const { title, slug, content, excerpt, published, scheduled_publish_at } = req.body;
 
     if (!title || !slug || !content) {
       res.status(400).json({ error: 'Title, slug, and content are required' });
@@ -152,10 +161,10 @@ router.put('/:id', authenticate, requireAdmin, async (req: Request, res: Respons
 
     const result = await db.query<BlogPost>(
       `UPDATE blog_posts
-       SET title = $1, slug = $2, content = $3, excerpt = $4, published = $5, updated_at = NOW()
-       WHERE id = $6
+       SET title = $1, slug = $2, content = $3, excerpt = $4, published = $5, scheduled_publish_at = $6, updated_at = NOW()
+       WHERE id = $7
        RETURNING *`,
-      [title, slug, content, excerpt || null, published || false, id]
+      [title, slug, content, excerpt || null, published || false, scheduled_publish_at || null, id]
     );
 
     if (!result.rows[0]) {
