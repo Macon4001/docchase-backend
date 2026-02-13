@@ -16,6 +16,7 @@ import googleAuthRouter from './routes/settings/google-auth.js';
 import googleCallbackRouter from './routes/settings/google-callback.js';
 import testRemindersRouter from './routes/test-reminders.js';
 import contactRouter from './routes/contact.js';
+import blogRouter from './routes/blog.js';
 import { startScheduledJobs } from './services/reminder-service.js';
 
 dotenv.config();
@@ -80,6 +81,7 @@ app.use('/api/settings', settingsRouter);
 app.use('/api/settings/google-auth', googleAuthRouter);
 app.use('/api/settings/google-callback', googleCallbackRouter);
 app.use('/api/contact', contactRouter);
+app.use('/api/blog', blogRouter);
 
 // Test routes (only in development)
 if (process.env.NODE_ENV === 'development') {
