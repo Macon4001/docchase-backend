@@ -224,14 +224,17 @@ export async function sendDocumentRequest(
   clientId: string,
   campaignId?: string
 ): Promise<Message> {
+  // Template variables array format for Twilio
+  const variables = {
+    1: clientName,
+    2: practiceName,
+    3: documentDescription,
+  };
+
   return sendWhatsAppTemplate(
     to,
     TWILIO_TEMPLATES.DOCUMENT_REQUEST,
-    {
-      '1': clientName,
-      '2': practiceName,
-      '3': documentDescription,
-    },
+    variables,
     accountantId,
     clientId,
     campaignId
@@ -250,13 +253,16 @@ export async function sendDocumentReminder(
   clientId: string,
   campaignId?: string
 ): Promise<Message> {
+  // Template variables format for Twilio
+  const variables = {
+    1: clientName,
+    2: documentDescription,
+  };
+
   return sendWhatsAppTemplate(
     to,
     TWILIO_TEMPLATES.DOCUMENT_REMINDER,
-    {
-      '1': clientName,
-      '2': documentDescription,
-    },
+    variables,
     accountantId,
     clientId,
     campaignId
