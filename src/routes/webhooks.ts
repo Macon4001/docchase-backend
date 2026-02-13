@@ -136,7 +136,9 @@ router.post('/twilio', async (req: Request, res: Response): Promise<void> => {
     }
 
     // Check if we should respond to this message
-    const shouldRespond = await shouldRespondToMessage(webhook.Body, hasMedia);
+    // Note: Responses are disabled when documents are received because WhatsApp
+    // may require approved templates for business-initiated messages
+    const shouldRespond = !hasMedia && await shouldRespondToMessage(webhook.Body, hasMedia);
 
     if (shouldRespond) {
       // Get accountant details for response
