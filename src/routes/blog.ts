@@ -12,6 +12,7 @@ interface BlogPost {
   slug: string;
   content: string;
   excerpt: string | null;
+  image_url: string | null;
   author_id: string;
   published: boolean;
   scheduled_publish_at: Date | null;
@@ -96,7 +97,7 @@ router.get('/:slug', async (req: Request, res: Response): Promise<void> => {
 router.post('/', authenticate, requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const authenticatedReq = req as AuthenticatedRequest;
-    const { title, slug, content, excerpt, published, scheduled_publish_at } = req.body;
+    const { title, slug, content, excerpt, image_url, published, scheduled_publish_at } = req.body;
 
     if (!title || !slug || !content) {
       res.status(400).json({ error: 'Title, slug, and content are required' });
@@ -115,14 +116,15 @@ router.post('/', authenticate, requireAdmin, async (req: Request, res: Response)
     }
 
     const result = await db.query<BlogPost>(
-      `INSERT INTO blog_posts (title, slug, content, excerpt, author_id, published, scheduled_publish_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO blog_posts (title, slug, content, excerpt, image_url, author_id, published, scheduled_publish_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING *`,
       [
         title,
         slug,
         content,
         excerpt || null,
+        image_url || null,
         authenticatedReq.accountant.id,
         published || false,
         scheduled_publish_at || null
@@ -141,7 +143,7 @@ router.post('/', authenticate, requireAdmin, async (req: Request, res: Response)
 router.put('/:id', authenticate, requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { title, slug, content, excerpt, published, scheduled_publish_at } = req.body;
+    const { title, slug, content, excerpt, image_url, published, scheduled_publish_at } = req.body;
 
     if (!title || !slug || !content) {
       res.status(400).json({ error: 'Title, slug, and content are required' });
@@ -161,10 +163,10 @@ router.put('/:id', authenticate, requireAdmin, async (req: Request, res: Respons
 
     const result = await db.query<BlogPost>(
       `UPDATE blog_posts
-       SET title = $1, slug = $2, content = $3, excerpt = $4, published = $5, scheduled_publish_at = $6, updated_at = NOW()
-       WHERE id = $7
+       SET title = $1, slug = $2, content = $3, excerpt = $4, image_url = $5, published = $6, scheduled_publish_at = $7, updated_at = NOW()
+       WHERE id = $8
        RETURNING *`,
-      [title, slug, content, excerpt || null, published || false, scheduled_publish_at || null, id]
+      [title, slug, content, excerpt || null, image_url || null, published || false, scheduled_publish_at || null, id]
     );
 
     if (!result.rows[0]) {
