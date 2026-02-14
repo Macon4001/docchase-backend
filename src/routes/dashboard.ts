@@ -11,11 +11,13 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
     const authenticatedReq = req as AuthenticatedRequest;
     const accountantId = authenticatedReq.accountant.id;
 
-    // Get active campaign
+    // Get active campaign with most clients (most activity)
     const campaignResult = await db.query<Campaign>(
-      `SELECT * FROM campaigns
-       WHERE accountant_id = $1 AND status = 'active'
-       ORDER BY created_at DESC
+      `SELECT c.* FROM campaigns c
+       LEFT JOIN campaign_clients cc ON c.id = cc.campaign_id
+       WHERE c.accountant_id = $1 AND c.status = 'active'
+       GROUP BY c.id
+       ORDER BY COUNT(cc.id) DESC, c.created_at DESC
        LIMIT 1`,
       [accountantId]
     );
