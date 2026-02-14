@@ -101,22 +101,36 @@ router.get('/activity', authenticate, async (req: Request, res: Response): Promi
     }
 
     // Get daily document collection activity for last 7 days
+    // Generate all 7 days and count status changes per day
     const activityResult = await db.query<{
       date: string;
       received: number;
       pending: number;
     }>(
-      `SELECT
-         DATE(d.created_at) as date,
-         COUNT(*) FILTER (WHERE cc.status = 'received')::int as received,
-         COUNT(*) FILTER (WHERE cc.status = 'pending')::int as pending
-       FROM campaign_clients cc
-       LEFT JOIN documents d ON d.client_id = cc.client_id
-         AND d.created_at >= CURRENT_DATE - INTERVAL '7 days'
-       WHERE cc.campaign_id = $1
-       AND cc.updated_at >= CURRENT_DATE - INTERVAL '7 days'
-       GROUP BY DATE(d.created_at)
-       ORDER BY date ASC`,
+      `WITH date_series AS (
+         SELECT generate_series(
+           CURRENT_DATE - INTERVAL '6 days',
+           CURRENT_DATE,
+           INTERVAL '1 day'
+         )::date as date
+       ),
+       daily_stats AS (
+         SELECT
+           DATE(cc.updated_at) as date,
+           COUNT(*) FILTER (WHERE cc.status = 'received')::int as received,
+           COUNT(*) FILTER (WHERE cc.status = 'pending')::int as pending
+         FROM campaign_clients cc
+         WHERE cc.campaign_id = $1
+         AND cc.updated_at >= CURRENT_DATE - INTERVAL '6 days'
+         GROUP BY DATE(cc.updated_at)
+       )
+       SELECT
+         ds.date::text,
+         COALESCE(dst.received, 0) as received,
+         COALESCE(dst.pending, 0) as pending
+       FROM date_series ds
+       LEFT JOIN daily_stats dst ON ds.date = dst.date
+       ORDER BY ds.date ASC`,
       [campaign.id]
     );
 
