@@ -78,4 +78,53 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
   }
 });
 
+// Get collection activity over time (last 7 days)
+router.get('/activity', authenticate, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const authenticatedReq = req as AuthenticatedRequest;
+    const accountantId = authenticatedReq.accountant.id;
+
+    // Get active campaign
+    const campaignResult = await db.query<Campaign>(
+      `SELECT * FROM campaigns
+       WHERE accountant_id = $1 AND status = 'active'
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [accountantId]
+    );
+
+    const campaign = campaignResult.rows[0];
+
+    if (!campaign) {
+      res.json({ activity: [] });
+      return;
+    }
+
+    // Get daily document collection activity for last 7 days
+    const activityResult = await db.query<{
+      date: string;
+      received: number;
+      pending: number;
+    }>(
+      `SELECT
+         DATE(d.created_at) as date,
+         COUNT(*) FILTER (WHERE cc.status = 'received')::int as received,
+         COUNT(*) FILTER (WHERE cc.status = 'pending')::int as pending
+       FROM campaign_clients cc
+       LEFT JOIN documents d ON d.client_id = cc.client_id
+         AND d.created_at >= CURRENT_DATE - INTERVAL '7 days'
+       WHERE cc.campaign_id = $1
+       AND cc.updated_at >= CURRENT_DATE - INTERVAL '7 days'
+       GROUP BY DATE(d.created_at)
+       ORDER BY date ASC`,
+      [campaign.id]
+    );
+
+    res.json({ activity: activityResult.rows });
+  } catch (error) {
+    console.error('Activity error:', error);
+    res.status(500).json({ error: 'Failed to load activity data' });
+  }
+});
+
 export default router;
