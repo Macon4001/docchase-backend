@@ -136,7 +136,7 @@ export interface DashboardData {
     total: number;
     received: number;
     pending: number;
-    stuck: number;
+    failed: number;
     clients: Array<{
       id: string;
       name: string;

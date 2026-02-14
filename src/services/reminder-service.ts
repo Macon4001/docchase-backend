@@ -270,11 +270,11 @@ export async function sendReminder2(): Promise<{ success: number; failed: number
 }
 
 /**
- * Flag Stuck Clients
- * Marks clients as "stuck" based on campaign's custom reminder_3_days setting
+ * Flag Failed Clients
+ * Marks clients as "failed" based on campaign's custom reminder_3_days setting
  */
-export async function flagStuckClients(): Promise<{ flagged: number; errors: string[] }> {
-  console.log('🚩 [Reminder Service] Checking for stuck clients...');
+export async function flagFailedClients(): Promise<{ flagged: number; errors: string[] }> {
+  console.log('🚩 [Reminder Service] Checking for failed clients...');
 
   const results = {
     flagged: 0,
@@ -300,35 +300,35 @@ export async function flagStuckClients(): Promise<{ flagged: number; errors: str
     const result = await db.query<{ id: string; client_name: string; first_message_sent_at: Date; reminder_3_days: number }>(query);
 
     if (result.rows.length === 0) {
-      console.log('✅ No clients to flag as stuck');
+      console.log('✅ No clients to flag as failed');
       return results;
     }
 
-    console.log(`🚩 Found ${result.rows.length} clients to flag as stuck`);
+    console.log(`🚩 Found ${result.rows.length} clients to flag as failed`);
 
     for (const client of result.rows) {
       try {
         await db.query(
           `UPDATE campaign_clients
-           SET status = 'stuck', stuck_at = NOW()
+           SET status = 'failed', stuck_at = NOW()
            WHERE id = $1`,
           [client.id]
         );
 
         results.flagged++;
-        console.log(`🚩 Marked ${client.client_name} as stuck (Day ${client.reminder_3_days})`);
+        console.log(`🚩 Marked ${client.client_name} as failed (Day ${client.reminder_3_days})`);
       } catch (error) {
-        const errorMsg = `Failed to flag ${client.client_name} as stuck: ${error}`;
+        const errorMsg = `Failed to flag ${client.client_name} as failed: ${error}`;
         results.errors.push(errorMsg);
         console.error(`❌ ${errorMsg}`);
       }
     }
   } catch (error) {
-    console.error('❌ Error in flagStuckClients:', error);
+    console.error('❌ Error in flagFailedClients:', error);
     results.errors.push(`Database error: ${error}`);
   }
 
-  console.log(`📊 Stuck Clients - Flagged: ${results.flagged}`);
+  console.log(`📊 Failed Clients - Flagged: ${results.flagged}`);
   return results;
 }
 
@@ -344,7 +344,7 @@ export async function runAllReminderChecks(): Promise<void> {
     // Run all checks in sequence
     await sendReminder1();
     await sendReminder2();
-    await flagStuckClients();
+    await flagFailedClients();
   } catch (error) {
     console.error('❌ Error in runAllReminderChecks:', error);
   }
@@ -366,10 +366,11 @@ export function startScheduledJobs(): void {
   console.log('✅ Scheduled reminder jobs started (runs every hour)');
   console.log('   - Checks for Reminder 1 (custom days per campaign)');
   console.log('   - Checks for Reminder 2 (custom days per campaign)');
-  console.log('   - Checks for stuck clients (custom days per campaign)');
+  console.log('   - Checks for failed clients (custom days per campaign)');
   console.log('   - Respects each campaign\'s configured send time\n');
 }
 
 // Keep legacy function names for backward compatibility with test endpoints
 export const sendDay3Reminders = sendReminder1;
 export const sendDay6Reminders = sendReminder2;
+export const flagStuckClients = flagFailedClients; // Legacy name compatibility

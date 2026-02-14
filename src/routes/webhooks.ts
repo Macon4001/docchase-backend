@@ -207,6 +207,50 @@ router.post('/twilio/status', async (req: Request, res: Response): Promise<void>
       [MessageStatus, MessageSid]
     );
 
+    // If message failed, create a notification and update campaign_client status
+    if (MessageStatus === 'failed' || MessageStatus === 'undelivered') {
+      console.log(`❌ Message failed: ${MessageSid} -> ${MessageStatus}`);
+
+      // Get message details to create notification
+      const messageResult = await db.query<Message>(
+        `SELECT m.*, c.name as client_name, camp.name as campaign_name
+         FROM messages m
+         JOIN clients c ON m.client_id = c.id
+         JOIN campaigns camp ON m.campaign_id = camp.id
+         WHERE m.twilio_sid = $1`,
+        [MessageSid]
+      );
+
+      if (messageResult.rows.length > 0) {
+        const message = messageResult.rows[0];
+        const clientName = (message as any).client_name;
+        const campaignName = (message as any).campaign_name;
+
+        // Create notification for failed message
+        await createNotification(
+          message.accountant_id,
+          'message_failed',
+          'Message Delivery Failed',
+          `Failed to deliver message to ${clientName}`,
+          clientName,
+          campaignName
+        );
+
+        // Update campaign_client status from 'pending' to 'failed'
+        await db.query(
+          `UPDATE campaign_clients
+           SET status = 'failed',
+               updated_at = NOW()
+           WHERE campaign_id = $1
+             AND client_id = $2
+             AND status = 'pending'`,
+          [message.campaign_id, message.client_id]
+        );
+
+        console.log(`🚨 Notification created and status updated to 'failed' for ${clientName}`);
+      }
+    }
+
     res.status(200).send('OK');
   } catch (error) {
     console.error('❌ Status callback error:', error);

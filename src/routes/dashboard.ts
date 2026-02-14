@@ -36,13 +36,13 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
       total: number;
       received: number;
       pending: number;
-      stuck: number;
+      failed: number;
     }>(
       `SELECT
          COUNT(*)::int as total,
          COUNT(*) FILTER (WHERE cc.status = 'received')::int as received,
          COUNT(*) FILTER (WHERE cc.status = 'pending')::int as pending,
-         COUNT(*) FILTER (WHERE cc.status = 'stuck')::int as stuck
+         COUNT(*) FILTER (WHERE cc.status = 'failed')::int as failed
        FROM campaign_clients cc
        WHERE cc.campaign_id = $1`,
       [campaign.id]

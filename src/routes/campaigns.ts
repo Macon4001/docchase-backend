@@ -18,7 +18,7 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
         COUNT(cc.id) as total_clients,
         COUNT(cc.id) FILTER (WHERE cc.status = 'pending') as pending,
         COUNT(cc.id) FILTER (WHERE cc.status = 'received') as received,
-        COUNT(cc.id) FILTER (WHERE cc.status = 'stuck') as stuck
+        COUNT(cc.id) FILTER (WHERE cc.status = 'failed') as failed
        FROM campaigns c
        LEFT JOIN campaign_clients cc ON c.id = cc.campaign_id
        WHERE c.accountant_id = $1
@@ -57,13 +57,13 @@ router.get('/:id', authenticate, async (req: Request, res: Response): Promise<vo
       total_clients: string;
       pending: string;
       received: string;
-      stuck: string;
+      failed: string;
     }>(
       `SELECT
         COUNT(*) as total_clients,
         COUNT(*) FILTER (WHERE status = 'pending') as pending,
         COUNT(*) FILTER (WHERE status = 'received') as received,
-        COUNT(*) FILTER (WHERE status = 'stuck') as stuck
+        COUNT(*) FILTER (WHERE status = 'failed') as failed
        FROM campaign_clients
        WHERE campaign_id = $1`,
       [campaignId]
@@ -73,7 +73,7 @@ router.get('/:id', authenticate, async (req: Request, res: Response): Promise<vo
       total_clients: '0',
       pending: '0',
       received: '0',
-      stuck: '0'
+      failed: '0'
     };
 
     res.json({
@@ -82,7 +82,7 @@ router.get('/:id', authenticate, async (req: Request, res: Response): Promise<vo
         total_clients: parseInt(stats.total_clients),
         pending: parseInt(stats.pending),
         received: parseInt(stats.received),
-        stuck: parseInt(stats.stuck)
+        failed: parseInt(stats.failed)
       }
     });
   } catch (error) {
